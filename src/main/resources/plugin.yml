@@ -1,0 +1,59 @@
+name: ChestLink
+version: 1.0.0-BETA
+main: dev.sergeantfuzzy.chestlink.ChestLinkPlugin
+api-version: 1.20
+description: Turn any chest you place into a portable virtual inventory accessible from any world.
+authors: [SergeantFuzzy]
+commands:
+  chestlink:
+    description: ChestLink main command
+    aliases: [cl, clink]
+permissions:
+  chestlink.use:
+    description: Use main command and basic interactions
+    default: true
+  chestlink.bind:
+    description: Bind a chest to a virtual inventory
+    default: true
+  chestlink.open:
+    description: Open linked inventories
+    default: true
+  chestlink.menu:
+    description: Open ChestLink menu
+    default: true
+  chestlink.rename:
+    description: Rename bound inventories
+    default: true
+  chestlink.reset:
+    description: Reset chest inventories
+    default: true
+  chestlink.delete:
+    description: Delete chest inventories
+    default: true
+  chestlink.tp:
+    description: Teleport to bound chest
+    default: op
+  chestlink.admin:
+    description: Admin permissions
+    default: op
+  chestlink.admin.view:
+    description: View player chests
+    default: op
+  chestlink.admin.reload:
+    description: Reload config
+    default: op
+  chestlink.admin.open:
+    description: Open player chests
+    default: op
+  chestlink.admin.wipe:
+    description: Wipe player chests
+    default: op
+  chestlink.admin.delete:
+    description: Delete player chests
+    default: op
+  chestlink.admin.migrate:
+    description: Reindex player chest ids
+    default: op
+  chestlink.admin.purge:
+    description: Purge broken links
+    default: op
