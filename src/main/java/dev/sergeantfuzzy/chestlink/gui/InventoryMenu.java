@@ -22,6 +22,8 @@ public class InventoryMenu {
     private final ChestLinkManager manager;
     private final MessageService messages;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d, yyyy");
+    private final Map<UUID, DeleteContext> pendingDeletes = new HashMap<>();
+    private static final String CONFIRM_TITLE = "&8Confirm Deletion of Linked Chest";
 
     public InventoryMenu(ChestLinkPlugin plugin, ChestLinkManager manager, MessageService messages) {
         this.plugin = plugin;
@@ -30,8 +32,7 @@ public class InventoryMenu {
     }
 
     public Inventory build(Player player, int page) {
-        List<BoundChest> chests = new ArrayList<>(manager.getData(player).getChests());
-        chests.sort(Comparator.comparingInt(BoundChest::getId));
+        List<BoundChest> chests = new ArrayList<>(manager.getAccessibleChests(player));
 
         int perPage = 45;
         int pages = Math.max(1, (int) Math.ceil(chests.size() / (double) perPage));
@@ -73,9 +74,18 @@ public class InventoryMenu {
         meta.setDisplayName(messages.color("&6" + chest.getName() + " &7(#" + chest.getId() + ")"));
 
         List<String> lore = new ArrayList<>();
-        lore.add(messages.color("&7Type: &6" + chest.getType().getDisplayName()));
-        lore.add(messages.color("&7Slots: &6" + chest.getType().getSize()));
-        lore.add(messages.color("&7Created: &6" + dateFormat.format(new Date(chest.getCreatedAt()))));
+        lore.add(messages.color("&7Last Modified: &f" + dateFormat.format(new Date(chest.getLastModified()))));
+        lore.add(messages.color("&7Usage: &f" + chest.getUsedSlots() + "/" + chest.getType().getSize() + " Slots Used"));
+        lore.add(messages.color("&7Owner: &f" + ownerName(chest.getOwner())));
+        lore.add(messages.color("&7Shared With:"));
+        if (chest.getShared().isEmpty()) {
+            lore.add(messages.color("&8 - None"));
+        } else {
+            chest.getShared().forEach((uuid, access) -> {
+                lore.add(messages.color("&8 - " + ownerName(uuid) + " (" + access.getAccessLevel().name().toLowerCase() + ")"));
+            });
+        }
+        lore.add(messages.color("&7Type: &f" + (chest.getType() == InventoryType.SINGLE ? "Single" : "Double")));
         if (chest.getLocation() != null && chest.getLocation().getWorld() != null) {
             lore.add(messages.color("&7World: &6" + chest.getLocation().getWorld().getName()));
             lore.add(messages.color("&7Location: &6X: &e" + chest.getLocation().getBlockX()
@@ -84,7 +94,7 @@ public class InventoryMenu {
         }
         lore.add(messages.color("&aLeft-Click: &7Open and view contents"));
         lore.add(messages.color("&eRight-Click: &7Reset this inventory"));
-        lore.add(messages.color("&cMiddle-Click: &7Delete this chest inventory (cannot be reversed)"));
+        lore.add(messages.color("&cShift-Left-Click: &7Delete this chest inventory (cannot be reversed)"));
         lore.add(messages.color("&6Shift-Right-Click: &7Rename this chest"));
         meta.setLore(lore);
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
@@ -92,7 +102,7 @@ public class InventoryMenu {
         return item;
     }
 
-    public void handleClick(Player player, Inventory inventory, int slot, ClickType type, int page) {
+    public void handleClick(Player player, Inventory inventory, int slot, ClickType type, org.bukkit.event.inventory.InventoryAction action, int page) {
         if (slot < 0 || slot >= inventory.getSize()) {
             return;
         }
@@ -105,28 +115,40 @@ public class InventoryMenu {
             return;
         }
         int index = page * 45 + slot;
-        List<BoundChest> chests = new ArrayList<>(manager.getData(player).getChests());
-        chests.sort(Comparator.comparingInt(BoundChest::getId));
+        List<BoundChest> chests = new ArrayList<>(manager.getAccessibleChests(player));
         if (index >= chests.size()) {
             return;
         }
         BoundChest chest = chests.get(index);
         if (type == ClickType.LEFT) {
+            if (!manager.canView(player, chest)) {
+                messages.send(player, "no-permission", null);
+                return;
+            }
             player.openInventory(chest.getInventory());
             chest.markAccessed();
+            manager.saveInventory(chest);
         } else if (type == ClickType.RIGHT) {
+            if (!manager.canModify(player, chest)) {
+                messages.send(player, "no-permission", null);
+                return;
+            }
             manager.resetChest(chest);
             messages.send(player, "reset", Map.of("name", chest.getName()));
             manager.save(player);
-        } else if (type == ClickType.MIDDLE || type == ClickType.CREATIVE) {
-            manager.deleteChest(player, chest);
-            messages.send(player, "delete", Map.of("name", chest.getName()));
-            manager.save(player);
-            int remaining = manager.getData(player).getChests().size();
-            int pages = Math.max(1, (int) Math.ceil(remaining / 45.0));
-            int newPage = Math.min(page, pages - 1);
-            open(player, newPage);
+        } else if (type == ClickType.SHIFT_LEFT || type == ClickType.MIDDLE || type == ClickType.CREATIVE
+                || type == ClickType.DROP || type == ClickType.CONTROL_DROP || type == ClickType.UNKNOWN
+                || eventIsClone(action)) {
+            if (!player.getUniqueId().equals(chest.getOwner())) {
+                messages.send(player, "no-permission", null);
+                return;
+            }
+            openDeleteConfirm(player, chest, page);
         } else if (type == ClickType.SHIFT_RIGHT) {
+            if (!player.getUniqueId().equals(chest.getOwner())) {
+                messages.send(player, "no-permission", null);
+                return;
+            }
             manager.getData(player).setPendingRename(chest.getId());
             player.closeInventory();
             messages.send(player, "rename-prompt", Map.of("name", chest.getName()));
@@ -135,5 +157,56 @@ public class InventoryMenu {
 
     public void open(Player player, int page) {
         player.openInventory(build(player, page));
+    }
+
+    // Detect creative middle-click clone actions
+    private boolean eventIsClone(org.bukkit.event.inventory.InventoryAction action) {
+        return action == org.bukkit.event.inventory.InventoryAction.CLONE_STACK;
+    }
+
+    private String ownerName(UUID uuid) {
+        org.bukkit.OfflinePlayer off = plugin.getServer().getOfflinePlayer(uuid);
+        if (off != null && off.getName() != null) {
+            return off.getName();
+        }
+        return uuid.toString().substring(0, 8);
+    }
+
+    public void openDeleteConfirm(Player player, BoundChest chest, int page) {
+        Inventory inv = Bukkit.createInventory(player, 9, messages.color(CONFIRM_TITLE));
+        inv.setItem(3, nav(Material.RED_STAINED_GLASS_PANE, "&cNo"));
+        inv.setItem(5, nav(Material.GREEN_STAINED_GLASS_PANE, "&aYes"));
+        pendingDeletes.put(player.getUniqueId(), new DeleteContext(chest, page));
+        player.openInventory(inv);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (player.getOpenInventory() != null && player.getOpenInventory().getTitle().equals(messages.color(CONFIRM_TITLE))) {
+                player.closeInventory();
+            }
+            pendingDeletes.remove(player.getUniqueId());
+        }, 100L);
+    }
+
+    public void handleDeleteConfirm(Player player, int slot) {
+        DeleteContext context = pendingDeletes.remove(player.getUniqueId());
+        if (context == null) {
+            return;
+        }
+        if (slot == 5) {
+            manager.deleteChest(player, context.chest());
+            messages.send(player, "delete", Map.of("name", context.chest().getName()));
+            int remaining = manager.getData(player).getChests().size();
+            int pages = Math.max(1, (int) Math.ceil(remaining / 45.0));
+            int newPage = Math.min(context.page(), pages - 1);
+            open(player, newPage);
+        } else {
+            open(player, context.page());
+        }
+    }
+
+    public boolean isConfirmInventory(String title) {
+        return org.bukkit.ChatColor.stripColor(title).equalsIgnoreCase(org.bukkit.ChatColor.stripColor(messages.color(CONFIRM_TITLE)));
+    }
+
+    private record DeleteContext(BoundChest chest, int page) {
     }
 }

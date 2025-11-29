@@ -21,6 +21,7 @@ public class MessageService {
         messages.put("usage-rename", "&eUsage: /chestlink rename <id|oldName> <newName>");
         messages.put("usage-reset", "&eUsage: /chestlink reset <id|name>");
         messages.put("usage-delete", "&eUsage: /chestlink delete <id|name>");
+        messages.put("usage-share", "&eUsage: /chestlink share <id|name> <player>");
         messages.put("usage-info", "&eUsage: /chestlink info <id|name>");
         messages.put("usage-tp", "&eUsage: /chestlink tp <id|name>");
         messages.put("usage-admin", "&eUsage: /chestlink admin <list|open|wipe|delete|migrate|purgebroken> <player?> <id?>");
@@ -43,6 +44,7 @@ public class MessageService {
         messages.put("admin-wipe", "&eWiped chest &6%id% &efor &6%player%&e.");
         messages.put("admin-delete", "&cDeleted chest &6%id% &cfor &6%player%&c.");
         messages.put("admin-missing-id", "&cYou must specify a chest id or name.");
+        messages.put("shared", "&aShared chest with &6%player% &aas &e%access%&a.");
     }
 
     public String getPrefix() {

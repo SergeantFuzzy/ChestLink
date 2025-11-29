@@ -6,10 +6,12 @@ import dev.sergeantfuzzy.chestlink.ChestLinkPlugin;
 import dev.sergeantfuzzy.chestlink.InventoryType;
 import dev.sergeantfuzzy.chestlink.PlayerData;
 import dev.sergeantfuzzy.chestlink.gui.InventoryMenu;
+import dev.sergeantfuzzy.chestlink.gui.ShareMenu;
 import dev.sergeantfuzzy.chestlink.lang.MessageService;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
@@ -30,12 +32,14 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
     private final ChestLinkManager manager;
     private MessageService messages;
     private InventoryMenu menu;
+    private ShareMenu shareMenu;
 
-    public ChestLinkCommand(ChestLinkPlugin plugin, ChestLinkManager manager, MessageService messages, InventoryMenu menu) {
+    public ChestLinkCommand(ChestLinkPlugin plugin, ChestLinkManager manager, MessageService messages, InventoryMenu menu, ShareMenu shareMenu) {
         this.plugin = plugin;
         this.manager = manager;
         this.messages = messages;
         this.menu = menu;
+        this.shareMenu = shareMenu;
     }
 
     @Override
@@ -72,6 +76,9 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
                 return true;
             case "delete":
                 handleDelete(player, Arrays.copyOfRange(args, 1, args.length));
+                return true;
+            case "share":
+                handleShare(player, Arrays.copyOfRange(args, 1, args.length));
                 return true;
             case "info":
                 handleInfo(player, Arrays.copyOfRange(args, 1, args.length));
@@ -127,13 +134,18 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             messages.send(player, "usage-open", null);
             return;
         }
-        BoundChest chest = manager.getChest(player, args[0]);
+        BoundChest chest = manager.getAccessibleChest(player, args[0]);
         if (chest == null) {
             messages.send(player, "not-found", null);
             return;
         }
+        if (!manager.canView(player, chest)) {
+            messages.send(player, "no-permission", null);
+            return;
+        }
         manager.sortInventory(chest.getInventory());
         chest.markAccessed();
+        manager.saveInventory(chest);
         player.openInventory(chest.getInventory());
     }
 
@@ -146,13 +158,14 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             messages.send(player, "usage-rename", null);
             return;
         }
-        BoundChest chest = manager.getChest(player, args[0]);
+        BoundChest chest = manager.getOwnedChest(player, args[0]);
         if (chest == null) {
             messages.send(player, "not-found", null);
             return;
         }
         String newName = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
         chest.setName(newName);
+        chest.markModified();
         messages.send(player, "rename-success", Map.of("name", newName));
         manager.save(player);
     }
@@ -166,12 +179,12 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             messages.send(player, "usage-reset", null);
             return;
         }
-        BoundChest chest = manager.getChest(player, args[0]);
+        BoundChest chest = manager.getOwnedChest(player, args[0]);
         if (chest == null) {
             messages.send(player, "not-found", null);
             return;
         }
-        chest.resetInventory();
+        manager.resetChest(chest);
         messages.send(player, "reset", Map.of("name", chest.getName()));
         manager.save(player);
     }
@@ -185,7 +198,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             messages.send(player, "usage-delete", null);
             return;
         }
-        BoundChest chest = manager.getChest(player, args[0]);
+        BoundChest chest = manager.getOwnedChest(player, args[0]);
         if (chest == null) {
             messages.send(player, "not-found", null);
             return;
@@ -195,12 +208,53 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
         manager.save(player);
     }
 
+    private void handleShare(Player player, String[] args) {
+        if (!player.hasPermission("chestlink.share")) {
+            messages.send(player, "no-permission", null);
+            return;
+        }
+        if (args.length < 2) {
+            messages.send(player, "usage-share", null);
+            return;
+        }
+        BoundChest chest = manager.getOwnedChest(player, args[0]);
+        if (chest == null) {
+            messages.send(player, "not-found", null);
+            return;
+        }
+        Player target = Bukkit.getPlayer(args[1]);
+        UUID targetId;
+        String targetName;
+        if (target != null) {
+            targetId = target.getUniqueId();
+            targetName = target.getName();
+        } else {
+            try {
+                targetId = UUID.fromString(args[1]);
+                targetName = args[1];
+            } catch (IllegalArgumentException e) {
+                OfflinePlayer offline = Bukkit.getOfflinePlayer(args[1]);
+                if (offline == null || offline.getUniqueId() == null) {
+                    messages.send(player, "admin-not-found", null);
+                    return;
+                }
+                targetId = offline.getUniqueId();
+                targetName = offline.getName() == null ? args[1] : offline.getName();
+            }
+        }
+        if (player.getUniqueId().equals(targetId)) {
+            messages.send(player, "no-permission", null);
+            return;
+        }
+        shareMenu.open(player, chest, targetId, targetName);
+    }
+
     private void handleInfo(Player player, String[] args) {
         if (args.length < 1) {
             messages.send(player, "usage-info", null);
             return;
         }
-        BoundChest chest = manager.getChest(player, args[0]);
+        BoundChest chest = manager.getAccessibleChest(player, args[0]);
         if (chest == null) {
             messages.send(player, "not-found", null);
             return;
@@ -238,8 +292,8 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             messages.send(player, "usage-tp", null);
             return;
         }
-        BoundChest chest = manager.getChest(player, args[0]);
-        if (chest == null || chest.getLocation() == null) {
+        BoundChest chest = manager.getAccessibleChest(player, args[0]);
+        if (chest == null || chest.getLocation() == null || !manager.canView(player, chest)) {
             messages.send(player, "not-found", null);
             return;
         }
@@ -255,6 +309,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
         plugin.reloadChestLink();
         this.messages = plugin.messages();
         this.menu = plugin.menu();
+        this.shareMenu = plugin.shareMenu();
         sendReloadButton(player);
     }
 
@@ -294,7 +349,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
                 return;
             }
             boolean readOnly = args.length >= 4 && args[3].equalsIgnoreCase("readonly");
-            BoundChest chest = manager.getChest(target, args[2]);
+            BoundChest chest = manager.getOwnedChest(target, args[2]);
             if (chest == null) {
                 messages.send(player, "not-found", null);
                 return;
@@ -322,9 +377,9 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
                 messages.send(player, "admin-not-found", null);
                 return;
             }
-            BoundChest chest = manager.getChest(target, args[2]);
+            BoundChest chest = manager.getOwnedChest(target, args[2]);
             if (chest != null) {
-                chest.resetInventory();
+                manager.resetChest(chest);
                 messages.send(player, "admin-wipe", Map.of("player", target.getName(), "id", String.valueOf(chest.getId())));
             } else {
                 messages.send(player, "not-found", null);
@@ -343,7 +398,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
                 messages.send(player, "admin-not-found", null);
                 return;
             }
-            BoundChest chest = manager.getChest(target, args[2]);
+            BoundChest chest = manager.getOwnedChest(target, args[2]);
             if (chest != null) {
                 manager.deleteChest(target, chest);
                 messages.send(player, "admin-delete", Map.of("player", target.getName(), "id", String.valueOf(chest.getId())));
@@ -376,6 +431,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(messages.color("&6/chestlink rename <id|oldName> <newName>&7 - Rename a chest"));
         player.sendMessage(messages.color("&6/chestlink reset <id|name>&7 - Wipe contents"));
         player.sendMessage(messages.color("&6/chestlink delete <id|name>&7 - Delete link"));
+        player.sendMessage(messages.color("&6/chestlink share <id|name> <player>&7 - Share access to a chest"));
         player.sendMessage(messages.color("&6/chestlink info <id|name>&7 - View details"));
         player.sendMessage(messages.color("&6/chestlink limits&7 - View your limits"));
         player.sendMessage(messages.color("&6/chestlink tp <id|name>&7 - Teleport to chest (if enabled)"));
@@ -405,8 +461,10 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             return Collections.emptyList();
         }
         PlayerData data = manager.getData(player);
+        List<BoundChest> owned = new ArrayList<>(data.getChests());
+        List<BoundChest> accessible = manager.getAccessibleChests(player);
         if (args.length == 1) {
-            return Arrays.asList("bind", "open", "rename", "reset", "delete", "info", "limits", "help", "tp", "admin", "reload");
+            return Arrays.asList("bind", "open", "rename", "reset", "delete", "share", "info", "limits", "help", "tp", "admin", "reload");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("admin")) {
             return Arrays.asList("list", "open", "wipe", "delete", "migrate", "purgebroken");
@@ -429,10 +487,17 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
                 return Arrays.asList("readonly");
             }
         }
-        if (args.length == 2 && Arrays.asList("open", "rename", "reset", "delete", "info", "tp").contains(args[0].toLowerCase(Locale.ENGLISH))) {
-            return data.getChests().stream()
-                    .map(c -> String.valueOf(c.getId()))
-                    .collect(Collectors.toList());
+        if (args.length == 2) {
+            String sub = args[0].toLowerCase(Locale.ENGLISH);
+            if (Arrays.asList("open", "info", "tp").contains(sub)) {
+                return accessible.stream().map(c -> String.valueOf(c.getId())).collect(Collectors.toList());
+            }
+            if (Arrays.asList("rename", "reset", "delete", "share").contains(sub)) {
+                return owned.stream().map(c -> String.valueOf(c.getId())).collect(Collectors.toList());
+            }
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("share")) {
+            return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
         }
         return Collections.emptyList();
     }

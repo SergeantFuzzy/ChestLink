@@ -3,3 +3,4 @@
 # - holograms-enabled: toggles success/failure holograms when binding a chest.
 teleport-enabled: false
 holograms-enabled: true
+share-default-expiry-seconds: 0

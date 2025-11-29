@@ -6,6 +6,7 @@ import dev.sergeantfuzzy.chestlink.ChestLinkPlugin;
 import dev.sergeantfuzzy.chestlink.InventoryType;
 import dev.sergeantfuzzy.chestlink.PlayerData;
 import dev.sergeantfuzzy.chestlink.gui.InventoryMenu;
+import dev.sergeantfuzzy.chestlink.gui.ShareMenu;
 import dev.sergeantfuzzy.chestlink.lang.MessageService;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -16,12 +17,14 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -31,18 +34,22 @@ import org.bukkit.ChatColor;
 
 import java.util.Locale;
 import java.util.Map;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 public class ChestEventsListener implements Listener {
     private final ChestLinkPlugin plugin;
     private final ChestLinkManager manager;
     private final MessageService messages;
     private final InventoryMenu menu;
+    private final ShareMenu shareMenu;
 
-    public ChestEventsListener(ChestLinkPlugin plugin, ChestLinkManager manager, MessageService messages, InventoryMenu menu) {
+    public ChestEventsListener(ChestLinkPlugin plugin, ChestLinkManager manager, MessageService messages, InventoryMenu menu, ShareMenu shareMenu) {
         this.plugin = plugin;
         this.manager = manager;
         this.messages = messages;
         this.menu = menu;
+        this.shareMenu = shareMenu;
     }
 
     @EventHandler
@@ -51,12 +58,9 @@ public class ChestEventsListener implements Listener {
         if (event.isCancelled()) {
             return;
         }
-        if (!player.hasPermission("chestlink.bind")) {
-            return;
-        }
-        if (event.getBlockPlaced().getType() != Material.CHEST && event.getBlockPlaced().getType() != Material.TRAPPED_CHEST) {
-            return;
-        }
+        if (manager.getPendingBind(player) == null) return; // only guard when binding
+        if (!player.hasPermission("chestlink.bind")) return;
+        if (event.getBlockPlaced().getType() != Material.CHEST && event.getBlockPlaced().getType() != Material.TRAPPED_CHEST) return;
         if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) {
             messages.send(player, "placement-deny-mode", null);
             event.setCancelled(true);
@@ -97,7 +101,7 @@ public class ChestEventsListener implements Listener {
         Material type = block.getType();
         boolean isChest = type == Material.CHEST || type == Material.TRAPPED_CHEST;
 
-        if (event.getAction() == Action.LEFT_CLICK_BLOCK && isChest && player.hasPermission("chestlink.bind")) {
+        if (event.getAction() == Action.LEFT_CLICK_BLOCK && isChest && player.hasPermission("chestlink.bind") && manager.getPendingBind(player) != null) {
             // finalize binding
             if (manager.getChest(player, block.getLocation()) != null) {
                 return;
@@ -120,7 +124,12 @@ public class ChestEventsListener implements Listener {
             BoundChest chest = manager.getChest(player, block.getLocation());
             if (chest != null) {
                 event.setCancelled(true);
+                if (!manager.canView(player, chest)) {
+                    messages.send(player, "no-permission", null);
+                    return;
+                }
                 chest.markAccessed();
+                manager.saveInventory(chest);
                 player.openInventory(chest.getInventory());
             }
         }
@@ -136,6 +145,16 @@ public class ChestEventsListener implements Listener {
             return;
         }
         String title = event.getView().getTitle();
+        if (shareMenu.isShareMenu(title)) {
+            event.setCancelled(true);
+            shareMenu.handleClick(player, event.getRawSlot());
+            return;
+        }
+        if (menu.isConfirmInventory(title)) {
+            event.setCancelled(true);
+            menu.handleDeleteConfirm(player, event.getRawSlot());
+            return;
+        }
         if (title.contains("Read-Only Admin View")) {
             event.setCancelled(true);
             return;
@@ -143,7 +162,19 @@ public class ChestEventsListener implements Listener {
         if (title.contains("ChestLink")) {
             event.setCancelled(true);
             int page = extractPage(title);
-            menu.handleClick(player, top, event.getRawSlot(), event.getClick(), page);
+            if (event.getClickedInventory() != null && event.getClickedInventory().equals(top)) {
+                menu.handleClick(player, top, event.getRawSlot(), event.getClick(), event.getAction(), page);
+            }
+            return;
+        }
+        BoundChest chest = manager.getByInventory(top);
+        if (chest != null) {
+            if (!manager.canModify(player, chest)) {
+                event.setCancelled(true);
+            } else {
+                chest.markModified();
+                manager.saveInventory(chest);
+            }
         }
     }
 
@@ -191,18 +222,31 @@ public class ChestEventsListener implements Listener {
         if (base == null || base.getWorld() == null) return;
         if (!plugin.getConfig().getBoolean("holograms-enabled", true)) return;
         Location loc = base.clone().add(0.5, 1.25, 0.5);
-        ArmorStand stand = base.getWorld().spawn(loc, ArmorStand.class, spawned -> {
-            spawned.setVisible(false);
-            spawned.setMarker(true);
-            spawned.setGravity(false);
-            spawned.setSmall(true);
-            spawned.setBasePlate(false);
-            spawned.setArms(false);
-            spawned.setCollidable(false);
-            spawned.setCustomName(text);
-            spawned.setCustomNameVisible(true);
-        });
-        Bukkit.getScheduler().runTaskLater(plugin, stand::remove, 60L);
+        try {
+            Component comp = LegacyComponentSerializer.legacySection().deserialize(text);
+            String legacy = LegacyComponentSerializer.legacySection().serialize(comp);
+            TextDisplay display = base.getWorld().spawn(loc, TextDisplay.class, spawned -> {
+                spawned.setText(legacy);
+                spawned.setBillboard(org.bukkit.entity.Display.Billboard.CENTER);
+                spawned.setSeeThrough(false);
+                spawned.setShadowed(false);
+                spawned.setAlignment(TextDisplay.TextAlignment.CENTER);
+            });
+            Bukkit.getScheduler().runTaskLater(plugin, display::remove, 60L);
+        } catch (Exception ignored) {
+            ArmorStand stand = base.getWorld().spawn(loc, ArmorStand.class, spawned -> {
+                spawned.setVisible(false);
+                spawned.setMarker(true);
+                spawned.setGravity(false);
+                spawned.setSmall(true);
+                spawned.setBasePlate(false);
+                spawned.setArms(false);
+                spawned.setCollidable(false);
+                spawned.setCustomName(text);
+                spawned.setCustomNameVisible(true);
+            });
+            Bukkit.getScheduler().runTaskLater(plugin, stand::remove, 60L);
+        }
     }
 
     private int extractPage(String title) {
@@ -212,6 +256,21 @@ public class ChestEventsListener implements Listener {
             return Integer.parseInt(left[left.length - 1].trim()) - 1;
         } catch (Exception e) {
             return 0;
+        }
+    }
+
+    @EventHandler
+    public void onClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) return;
+        Inventory inv = event.getInventory();
+        String title = event.getView().getTitle();
+        if (shareMenu.isShareMenu(title)) {
+            shareMenu.clear(player);
+        }
+        BoundChest chest = manager.getByInventory(inv);
+        if (chest != null && manager.canModify(player, chest)) {
+            chest.markModified();
+            manager.saveInventory(chest);
         }
     }
 }

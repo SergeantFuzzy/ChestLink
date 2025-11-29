@@ -8,13 +8,10 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 public class BoundChest {
+    private final String storageId;
     private final int id;
     private String name;
     private final UUID owner;
@@ -22,9 +19,12 @@ public class BoundChest {
     private Location location;
     private final long createdAt;
     private long lastAccessed;
+    private long lastModified;
     private Inventory inventory;
+    private final Map<UUID, SharedAccess> shared = new HashMap<>();
 
-    public BoundChest(int id, UUID owner, String name, InventoryType type, Location location, long createdAt, long lastAccessed, Inventory inventory) {
+    public BoundChest(String storageId, int id, UUID owner, String name, InventoryType type, Location location, long createdAt, long lastAccessed, long lastModified, Inventory inventory) {
+        this.storageId = storageId;
         this.id = id;
         this.owner = owner;
         this.name = name;
@@ -32,7 +32,12 @@ public class BoundChest {
         this.location = location;
         this.createdAt = createdAt;
         this.lastAccessed = lastAccessed;
+        this.lastModified = lastModified;
         this.inventory = inventory;
+    }
+
+    public String getStorageId() {
+        return storageId;
     }
 
     public int getId() {
@@ -71,6 +76,15 @@ public class BoundChest {
         return lastAccessed;
     }
 
+    public long getLastModified() {
+        return lastModified;
+    }
+
+    public void markModified() {
+        this.lastModified = Instant.now().toEpochMilli();
+        markAccessed();
+    }
+
     public void markAccessed() {
         this.lastAccessed = Instant.now().toEpochMilli();
     }
@@ -102,6 +116,7 @@ public class BoundChest {
         section.set("name", name);
         section.set("owner", owner.toString());
         section.set("type", type.name());
+        section.set("lastModified", lastModified);
         if (location != null) {
             section.set("world", location.getWorld() != null ? location.getWorld().getName() : null);
             section.set("x", location.getBlockX());
@@ -111,6 +126,12 @@ public class BoundChest {
         section.set("created", createdAt);
         section.set("lastAccessed", lastAccessed);
         section.set("contents", inventory.getContents());
+        ConfigurationSection sharedSection = section.createSection("shared");
+        for (Map.Entry<UUID, SharedAccess> entry : shared.entrySet()) {
+            ConfigurationSection s = sharedSection.createSection(entry.getKey().toString());
+            s.set("access", entry.getValue().getAccessLevel().name());
+            s.set("expires", entry.getValue().getExpiresAt());
+        }
         return section;
     }
 
@@ -126,6 +147,7 @@ public class BoundChest {
         }
         long created = section.getLong("created", Instant.now().toEpochMilli());
         long lastAccess = section.getLong("lastAccessed", created);
+        long lastModified = section.getLong("lastModified", lastAccess);
         List<ItemStack> contents = new ArrayList<>(Collections.nCopies(type.getSize(), null));
         List<?> raw = section.getList("contents");
         if (raw != null) {
@@ -139,6 +161,68 @@ public class BoundChest {
         Inventory inv = Bukkit.createInventory(null, type.getSize(), name);
         ItemStack[] contentArray = contents.toArray(new ItemStack[contents.size()]);
         inv.setContents(contentArray);
-        return new BoundChest(id, owner, name, type, loc, created, lastAccess, inv);
+        String storageId = owner.toString() + "-" + id;
+        BoundChest bound = new BoundChest(storageId, id, owner, name, type, loc, created, lastAccess, lastModified, inv);
+        ConfigurationSection sharedSection = section.getConfigurationSection("shared");
+        if (sharedSection != null) {
+            for (String key : sharedSection.getKeys(false)) {
+                ConfigurationSection s = sharedSection.getConfigurationSection(key);
+                if (s == null) continue;
+                try {
+                    UUID target = UUID.fromString(key);
+                    AccessLevel level = AccessLevel.valueOf(s.getString("access", AccessLevel.VIEW.name()));
+                    Long expires = s.contains("expires") ? s.getLong("expires") : null;
+                    bound.shared.put(target, new SharedAccess(level, expires));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+        bound.pruneExpired();
+        return bound;
+    }
+
+    public Map<UUID, SharedAccess> getShared() {
+        return Collections.unmodifiableMap(shared);
+    }
+
+    public void setSharedAccess(UUID target, SharedAccess access) {
+        if (access == null) {
+            shared.remove(target);
+        } else {
+            shared.put(target, access);
+        }
+        pruneExpired();
+    }
+
+    public void pruneExpired() {
+        long now = Instant.now().toEpochMilli();
+        shared.entrySet().removeIf(e -> e.getValue().isExpired(now));
+    }
+
+    public boolean canView(UUID requester) {
+        if (requester == null) return false;
+        if (requester.equals(owner)) return true;
+        SharedAccess access = shared.get(requester);
+        return access != null && !access.isExpired(Instant.now().toEpochMilli());
+    }
+
+    public boolean canModify(UUID requester) {
+        if (requester == null) return false;
+        if (requester.equals(owner)) return true;
+        SharedAccess access = shared.get(requester);
+        if (access == null || access.isExpired(Instant.now().toEpochMilli())) {
+            return false;
+        }
+        return access.getAccessLevel() == AccessLevel.MODIFY;
+    }
+
+    public int getUsedSlots() {
+        int used = 0;
+        for (ItemStack stack : inventory.getContents()) {
+            if (stack != null && stack.getType() != org.bukkit.Material.AIR) {
+                used++;
+            }
+        }
+        return used;
     }
 }
