@@ -1,6 +1,7 @@
 package dev.sergeantfuzzy.chestlink;
 
 import dev.sergeantfuzzy.chestlink.command.ChestLinkCommand;
+import dev.sergeantfuzzy.chestlink.listener.ChestDropListener;
 import dev.sergeantfuzzy.chestlink.gui.InventoryMenu;
 import dev.sergeantfuzzy.chestlink.gui.ShareMenu;
 import dev.sergeantfuzzy.chestlink.lang.MessageService;
@@ -22,6 +23,7 @@ public class ChestLinkPlugin extends JavaPlugin {
     private MessageService messages;
     private InventoryMenu menu;
     private ShareMenu shareMenu;
+    private ChestDropSettings chestDropSettings;
 
     public static ChestLinkPlugin get() {
         return instance;
@@ -31,6 +33,7 @@ public class ChestLinkPlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
+        chestDropSettings = ChestDropSettings.fromConfig(getConfig());
         messages = new MessageService();
         DataStore store = new DataStore(getDataFolder());
         store.migrateLegacy(getDataFolder());
@@ -42,6 +45,7 @@ public class ChestLinkPlugin extends JavaPlugin {
         getCommand("chestlink").setExecutor(command);
         getCommand("chestlink").setTabCompleter(command);
         Bukkit.getPluginManager().registerEvents(new ChestEventsListener(this, manager, messages, menu, shareMenu), this);
+        Bukkit.getPluginManager().registerEvents(new ChestDropListener(this, manager, messages, chestDropSettings), this);
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new ChestLinkPlaceholder(this, manager).register();
@@ -70,13 +74,19 @@ public class ChestLinkPlugin extends JavaPlugin {
         return shareMenu;
     }
 
+    public ChestDropSettings chestDropSettings() {
+        return chestDropSettings;
+    }
+
     public void reloadChestLink() {
         reloadConfig();
+        chestDropSettings = ChestDropSettings.fromConfig(getConfig());
         messages = new MessageService();
         menu = new InventoryMenu(this, manager, messages);
         shareMenu = new ShareMenu(this, manager, messages);
         HandlerList.unregisterAll(this);
         Bukkit.getPluginManager().registerEvents(new ChestEventsListener(this, manager, messages, menu, shareMenu), this);
+        Bukkit.getPluginManager().registerEvents(new ChestDropListener(this, manager, messages, chestDropSettings), this);
     }
 
     private void logStatus(boolean enabled) {
