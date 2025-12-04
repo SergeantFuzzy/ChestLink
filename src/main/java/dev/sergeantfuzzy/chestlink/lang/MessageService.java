@@ -1,9 +1,15 @@
 package dev.sergeantfuzzy.chestlink.lang;
 
+import dev.sergeantfuzzy.chestlink.BoundChest;
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.HoverEvent;
+import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class MessageService {
@@ -63,6 +69,23 @@ public class MessageService {
 
     public void send(CommandSender sender, String path, Map<String, String> placeholders) {
         sender.sendMessage(msg(path, placeholders));
+    }
+
+    public void sendClickableRename(Player player, BoundChest chest, List<String> hoverLore) {
+        if (player == null || chest == null) {
+            return;
+        }
+        String base = color(getPrefix() + "&aRenamed chest to ");
+        TextComponent main = new TextComponent(TextComponent.fromLegacyText(base));
+        TextComponent name = new TextComponent(color("&6" + chest.getName()));
+        name.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/chestlink open " + chest.getId()));
+        if (hoverLore != null && !hoverLore.isEmpty()) {
+            String hover = String.join("\n", hoverLore);
+            name.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(hover)));
+        }
+        main.addExtra(name);
+        main.addExtra(new TextComponent(color("&a.")));
+        player.spigot().sendMessage(main);
     }
 
     public static String color(String input) {

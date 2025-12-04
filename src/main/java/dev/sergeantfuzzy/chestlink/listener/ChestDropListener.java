@@ -5,11 +5,11 @@ import dev.sergeantfuzzy.chestlink.ChestDropSettings;
 import dev.sergeantfuzzy.chestlink.ChestDropSettings.OverflowBehavior;
 import dev.sergeantfuzzy.chestlink.ChestLinkManager;
 import dev.sergeantfuzzy.chestlink.ChestLinkPlugin;
+import dev.sergeantfuzzy.chestlink.compat.SchedulerCompat;
 import dev.sergeantfuzzy.chestlink.lang.MessageService;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -247,7 +247,7 @@ public class ChestDropListener implements Listener {
             });
             long ticks = Math.max(1, Math.round(settings.hologramDurationSeconds() * 20));
             activeHolograms.put(key, display);
-            Bukkit.getScheduler().runTaskLater(plugin, () -> removeIfSame(key, display), ticks);
+            SchedulerCompat.runLocationTaskLater(plugin, chestLoc, () -> removeIfSame(key, display), ticks);
         } catch (Exception ignored) {
             ArmorStand stand = chestLoc.getWorld().spawn(loc, ArmorStand.class, spawned -> {
                 spawned.setVisible(false);
@@ -262,7 +262,7 @@ public class ChestDropListener implements Listener {
             });
             long ticks = Math.max(1, Math.round(settings.hologramDurationSeconds() * 20));
             activeHolograms.put(key, stand);
-            Bukkit.getScheduler().runTaskLater(plugin, () -> removeIfSame(key, stand), ticks);
+            SchedulerCompat.runLocationTaskLater(plugin, chestLoc, () -> removeIfSame(key, stand), ticks);
         }
     }
 

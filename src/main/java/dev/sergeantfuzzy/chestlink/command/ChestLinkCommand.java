@@ -164,10 +164,8 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             return;
         }
         String newName = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-        chest.setName(newName);
-        chest.markModified();
-        messages.send(player, "rename-success", Map.of("name", newName));
-        manager.save(player);
+        manager.renameChest(player, chest, newName);
+        messages.sendClickableRename(player, chest, menu.describeChest(chest));
     }
 
     private void handleReset(Player player, String[] args) {
@@ -426,15 +424,27 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(Player player) {
         player.sendMessage(messages.color(messages.getPrefix() + "&eChestLink Commands"));
-        player.sendMessage(messages.color("&6/chestlink bind <name>&7 - Start binding a chest you place and punch"));
-        player.sendMessage(messages.color("&6/chestlink open <id|name>&7 - Open linked chest"));
-        player.sendMessage(messages.color("&6/chestlink rename <id|oldName> <newName>&7 - Rename a chest"));
-        player.sendMessage(messages.color("&6/chestlink reset <id|name>&7 - Wipe contents"));
-        player.sendMessage(messages.color("&6/chestlink delete <id|name>&7 - Delete link"));
-        player.sendMessage(messages.color("&6/chestlink share <id|name> <player>&7 - Share access to a chest"));
-        player.sendMessage(messages.color("&6/chestlink info <id|name>&7 - View details"));
-        player.sendMessage(messages.color("&6/chestlink limits&7 - View your limits"));
-        player.sendMessage(messages.color("&6/chestlink tp <id|name>&7 - Teleport to chest (if enabled)"));
+        sendHelpLine(player, "/chestlink bind <name>", "&7 - Start binding a chest you place and punch");
+        sendHelpLine(player, "/chestlink open <id|name>", "&7 - Open linked chest");
+        sendHelpLine(player, "/chestlink rename <id|oldName> <newName>", "&7 - Rename a chest");
+        sendHelpLine(player, "/chestlink reset <id|name>", "&7 - Wipe contents");
+        sendHelpLine(player, "/chestlink delete <id|name>", "&7 - Delete link");
+        sendHelpLine(player, "/chestlink share <id|name> <player>", "&7 - Share access to a chest");
+        sendHelpLine(player, "/chestlink info <id|name>", "&7 - View details");
+        sendHelpLine(player, "/chestlink limits", "&7 - View your limits");
+        sendHelpLine(player, "/chestlink tp <id|name>", "&7 - Teleport to chest (if enabled)");
+    }
+
+    private void sendHelpLine(Player player, String commandText, String description) {
+        TextComponent line = new TextComponent("");
+        TextComponent cmd = new TextComponent(messages.color("&6" + commandText));
+        cmd.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, commandText + " "));
+        TextComponent desc = new TextComponent(messages.color(" " + description));
+        desc.setClickEvent(null);
+        desc.setHoverEvent(null);
+        line.addExtra(cmd);
+        line.addExtra(desc);
+        player.spigot().sendMessage(line);
     }
 
     private int getLimit(Player player, InventoryType type) {

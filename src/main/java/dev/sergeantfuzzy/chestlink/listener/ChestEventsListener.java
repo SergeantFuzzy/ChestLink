@@ -8,10 +8,10 @@ import dev.sergeantfuzzy.chestlink.PlayerData;
 import dev.sergeantfuzzy.chestlink.gui.InventoryMenu;
 import dev.sergeantfuzzy.chestlink.gui.ShareMenu;
 import dev.sergeantfuzzy.chestlink.lang.MessageService;
+import dev.sergeantfuzzy.chestlink.compat.SchedulerCompat;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
@@ -190,10 +190,9 @@ public class ChestEventsListener implements Listener {
         String newName = event.getMessage().trim();
         BoundChest chest = data.getByIdOrName(String.valueOf(renameId));
         if (chest != null) {
-            chest.setName(newName);
-            messages.send(player, "rename-success", Map.of("name", newName));
+            manager.renameChest(player, chest, newName);
+            messages.sendClickableRename(player, chest, menu.describeChest(chest));
             data.setPendingRename(null);
-            manager.save(player);
         }
     }
 
@@ -232,7 +231,7 @@ public class ChestEventsListener implements Listener {
                 spawned.setShadowed(false);
                 spawned.setAlignment(TextDisplay.TextAlignment.CENTER);
             });
-            Bukkit.getScheduler().runTaskLater(plugin, display::remove, 60L);
+            SchedulerCompat.runLocationTaskLater(plugin, base, display::remove, 60L);
         } catch (Exception ignored) {
             ArmorStand stand = base.getWorld().spawn(loc, ArmorStand.class, spawned -> {
                 spawned.setVisible(false);
@@ -245,7 +244,7 @@ public class ChestEventsListener implements Listener {
                 spawned.setCustomName(text);
                 spawned.setCustomNameVisible(true);
             });
-            Bukkit.getScheduler().runTaskLater(plugin, stand::remove, 60L);
+            SchedulerCompat.runLocationTaskLater(plugin, base, stand::remove, 60L);
         }
     }
 

@@ -4,6 +4,7 @@ import dev.sergeantfuzzy.chestlink.BoundChest;
 import dev.sergeantfuzzy.chestlink.ChestLinkManager;
 import dev.sergeantfuzzy.chestlink.ChestLinkPlugin;
 import dev.sergeantfuzzy.chestlink.InventoryType;
+import dev.sergeantfuzzy.chestlink.compat.SchedulerCompat;
 import dev.sergeantfuzzy.chestlink.lang.MessageService;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -73,25 +74,7 @@ public class InventoryMenu {
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName(messages.color("&6" + chest.getName() + " &7(#" + chest.getId() + ")"));
 
-        List<String> lore = new ArrayList<>();
-        lore.add(messages.color("&7Last Modified: &f" + dateFormat.format(new Date(chest.getLastModified()))));
-        lore.add(messages.color("&7Usage: &f" + chest.getUsedSlots() + "/" + chest.getType().getSize() + " Slots Used"));
-        lore.add(messages.color("&7Owner: &f" + ownerName(chest.getOwner())));
-        lore.add(messages.color("&7Shared With:"));
-        if (chest.getShared().isEmpty()) {
-            lore.add(messages.color("&8 - None"));
-        } else {
-            chest.getShared().forEach((uuid, access) -> {
-                lore.add(messages.color("&8 - " + ownerName(uuid) + " (" + access.getAccessLevel().name().toLowerCase() + ")"));
-            });
-        }
-        lore.add(messages.color("&7Type: &f" + (chest.getType() == InventoryType.SINGLE ? "Single" : "Double")));
-        if (chest.getLocation() != null && chest.getLocation().getWorld() != null) {
-            lore.add(messages.color("&7World: &6" + chest.getLocation().getWorld().getName()));
-            lore.add(messages.color("&7Location: &6X: &e" + chest.getLocation().getBlockX()
-                    + " &7| &6Y: &e" + chest.getLocation().getBlockY()
-                    + " &7| &6Z: &e" + chest.getLocation().getBlockZ()));
-        }
+        List<String> lore = describeChest(chest);
         lore.add(messages.color("&aLeft-Click: &7Open and view contents"));
         lore.add(messages.color("&eRight-Click: &7Reset this inventory"));
         lore.add(messages.color("&cShift-Left-Click: &7Delete this chest inventory (cannot be reversed)"));
@@ -172,13 +155,34 @@ public class InventoryMenu {
         return uuid.toString().substring(0, 8);
     }
 
+    public List<String> describeChest(BoundChest chest) {
+        List<String> lore = new ArrayList<>();
+        lore.add(messages.color("&7Last Modified: &f" + dateFormat.format(new Date(chest.getLastModified()))));
+        lore.add(messages.color("&7Usage: &f" + chest.getUsedSlots() + "/" + chest.getType().getSize() + " Slots Used"));
+        lore.add(messages.color("&7Owner: &f" + ownerName(chest.getOwner())));
+        lore.add(messages.color("&7Shared With:"));
+        if (chest.getShared().isEmpty()) {
+            lore.add(messages.color("&8 - None"));
+        } else {
+            chest.getShared().forEach((uuid, access) -> lore.add(messages.color("&8 - " + ownerName(uuid) + " (" + access.getAccessLevel().name().toLowerCase() + ")")));
+        }
+        lore.add(messages.color("&7Type: &f" + (chest.getType() == InventoryType.SINGLE ? "Single" : "Double")));
+        if (chest.getLocation() != null && chest.getLocation().getWorld() != null) {
+            lore.add(messages.color("&7World: &6" + chest.getLocation().getWorld().getName()));
+            lore.add(messages.color("&7Location: &6X: &e" + chest.getLocation().getBlockX()
+                    + " &7| &6Y: &e" + chest.getLocation().getBlockY()
+                    + " &7| &6Z: &e" + chest.getLocation().getBlockZ()));
+        }
+        return lore;
+    }
+
     public void openDeleteConfirm(Player player, BoundChest chest, int page) {
         Inventory inv = Bukkit.createInventory(player, 9, messages.color(CONFIRM_TITLE));
         inv.setItem(3, nav(Material.RED_STAINED_GLASS_PANE, "&cNo"));
         inv.setItem(5, nav(Material.GREEN_STAINED_GLASS_PANE, "&aYes"));
         pendingDeletes.put(player.getUniqueId(), new DeleteContext(chest, page));
         player.openInventory(inv);
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        SchedulerCompat.runEntityTaskLater(plugin, player, () -> {
             if (player.getOpenInventory() != null && player.getOpenInventory().getTitle().equals(messages.color(CONFIRM_TITLE))) {
                 player.closeInventory();
             }
