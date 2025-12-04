@@ -45,7 +45,7 @@ public class PlayerData {
         org.bukkit.inventory.Inventory inv = org.bukkit.Bukkit.createInventory(null, type.getSize(), name);
         String storageId = owner.toString() + "-" + id;
         long now = System.currentTimeMillis();
-        BoundChest chest = new BoundChest(storageId, id, owner, name, type, location, now, now, now, inv);
+        BoundChest chest = new BoundChest(storageId, id, owner, name, type, location, now, now, now, inv, new ChestUpgrades());
         chests.put(id, chest);
         return chest;
     }
@@ -78,7 +78,7 @@ public class PlayerData {
         for (BoundChest chest : all) {
             String storageId = chest.getOwner().toString() + "-" + id;
             chests.put(id, new BoundChest(storageId, id, chest.getOwner(), chest.getName(), chest.getType(), chest.getLocation(),
-                    chest.getCreatedAt(), chest.getLastAccessed(), chest.getLastModified(), chest.getInventory()));
+                    chest.getCreatedAt(), chest.getLastAccessed(), chest.getLastModified(), chest.getInventory(), chest.getUpgrades().copy()));
             id++;
         }
         nextId = id;

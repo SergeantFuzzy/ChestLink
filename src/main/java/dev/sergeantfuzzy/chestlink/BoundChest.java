@@ -21,9 +21,14 @@ public class BoundChest {
     private long lastAccessed;
     private long lastModified;
     private Inventory inventory;
+    private final ChestUpgrades upgrades;
     private final Map<UUID, SharedAccess> shared = new HashMap<>();
 
     public BoundChest(String storageId, int id, UUID owner, String name, InventoryType type, Location location, long createdAt, long lastAccessed, long lastModified, Inventory inventory) {
+        this(storageId, id, owner, name, type, location, createdAt, lastAccessed, lastModified, inventory, new ChestUpgrades());
+    }
+
+    public BoundChest(String storageId, int id, UUID owner, String name, InventoryType type, Location location, long createdAt, long lastAccessed, long lastModified, Inventory inventory, ChestUpgrades upgrades) {
         this.storageId = storageId;
         this.id = id;
         this.owner = owner;
@@ -34,6 +39,7 @@ public class BoundChest {
         this.lastAccessed = lastAccessed;
         this.lastModified = lastModified;
         this.inventory = inventory;
+        this.upgrades = upgrades != null ? upgrades : new ChestUpgrades();
     }
 
     public String getStorageId() {
@@ -93,6 +99,23 @@ public class BoundChest {
         return inventory;
     }
 
+    public ChestUpgrades getUpgrades() {
+        return upgrades;
+    }
+
+    public int getUpgradeLevel(ChestUpgradeType type) {
+        return upgrades.getLevel(type);
+    }
+
+    public void setUpgradeLevel(ChestUpgradeType type, int level) {
+        upgrades.setLevel(type, level);
+        markModified();
+    }
+
+    public boolean hasUpgrade(ChestUpgradeType type) {
+        return upgrades.isUnlocked(type);
+    }
+
     public void resetInventory() {
         inventory.clear();
     }
@@ -126,6 +149,13 @@ public class BoundChest {
         section.set("created", createdAt);
         section.set("lastAccessed", lastAccessed);
         section.set("contents", inventory.getContents());
+        Map<String, Integer> upgradeMap = upgrades.toSerializable();
+        if (!upgradeMap.isEmpty()) {
+            ConfigurationSection upgradesSection = section.createSection("upgrades");
+            for (Map.Entry<String, Integer> entry : upgradeMap.entrySet()) {
+                upgradesSection.set(entry.getKey(), entry.getValue());
+            }
+        }
         ConfigurationSection sharedSection = section.createSection("shared");
         for (Map.Entry<UUID, SharedAccess> entry : shared.entrySet()) {
             ConfigurationSection s = sharedSection.createSection(entry.getKey().toString());
@@ -162,7 +192,15 @@ public class BoundChest {
         ItemStack[] contentArray = contents.toArray(new ItemStack[contents.size()]);
         inv.setContents(contentArray);
         String storageId = owner.toString() + "-" + id;
-        BoundChest bound = new BoundChest(storageId, id, owner, name, type, loc, created, lastAccess, lastModified, inv);
+        Map<String, Integer> upgradesRaw = new HashMap<>();
+        ConfigurationSection upgradesSection = section.getConfigurationSection("upgrades");
+        if (upgradesSection != null) {
+            for (String key : upgradesSection.getKeys(false)) {
+                upgradesRaw.put(key, upgradesSection.getInt(key));
+            }
+        }
+        ChestUpgrades upgrades = ChestUpgrades.fromSerializable(upgradesRaw);
+        BoundChest bound = new BoundChest(storageId, id, owner, name, type, loc, created, lastAccess, lastModified, inv, upgrades);
         ConfigurationSection sharedSection = section.getConfigurationSection("shared");
         if (sharedSection != null) {
             for (String key : sharedSection.getKeys(false)) {
