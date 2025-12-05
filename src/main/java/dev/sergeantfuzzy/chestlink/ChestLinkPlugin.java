@@ -7,6 +7,7 @@ import dev.sergeantfuzzy.chestlink.lang.MessageService;
 import dev.sergeantfuzzy.chestlink.listener.ChestEventsListener;
 import dev.sergeantfuzzy.chestlink.placeholder.ChestLinkPlaceholder;
 import dev.sergeantfuzzy.chestlink.storage.DataStore;
+import dev.sergeantfuzzy.chestlink.upgrade.UpgradeRegistry;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -22,6 +23,7 @@ public class ChestLinkPlugin extends JavaPlugin {
     private MessageService messages;
     private InventoryMenu menu;
     private ShareMenu shareMenu;
+    private UpgradeRegistry upgrades;
 
     public static ChestLinkPlugin get() {
         return instance;
@@ -34,6 +36,8 @@ public class ChestLinkPlugin extends JavaPlugin {
         messages = new MessageService();
         DataStore store = new DataStore(getDataFolder());
         store.migrateLegacy(getDataFolder());
+        upgrades = new UpgradeRegistry();
+        upgrades.registerDefaults();
         manager = new ChestLinkManager(store, messages);
         menu = new InventoryMenu(this, manager, messages);
         shareMenu = new ShareMenu(this, manager, messages);
@@ -68,6 +72,10 @@ public class ChestLinkPlugin extends JavaPlugin {
 
     public ShareMenu shareMenu() {
         return shareMenu;
+    }
+
+    public UpgradeRegistry upgrades() {
+        return upgrades;
     }
 
     public void reloadChestLink() {
