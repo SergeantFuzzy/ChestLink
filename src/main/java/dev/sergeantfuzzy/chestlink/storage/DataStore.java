@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.sergeantfuzzy.chestlink.AccessLevel;
 import dev.sergeantfuzzy.chestlink.BoundChest;
+import dev.sergeantfuzzy.chestlink.ChestUpgrades;
 import dev.sergeantfuzzy.chestlink.InventoryType;
 import dev.sergeantfuzzy.chestlink.PlayerData;
 import dev.sergeantfuzzy.chestlink.SharedAccess;
@@ -29,6 +30,7 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -158,6 +160,11 @@ public class DataStore {
             shared.add(entry.getKey().toString(), s);
         }
         obj.add("shared", shared);
+        JsonObject upgrades = new JsonObject();
+        for (Map.Entry<String, Integer> entry : chest.getUpgrades().toSerializable().entrySet()) {
+            upgrades.addProperty(entry.getKey(), entry.getValue());
+        }
+        obj.add("upgrades", upgrades);
         obj.addProperty("contents", inventoryToBase64(chest.getInventory()));
         writeJson(inventoryFile(chest.getStorageId()), obj);
     }
@@ -231,6 +238,19 @@ public class DataStore {
             long lastAccessed = obj.has("lastAccessed") ? obj.get("lastAccessed").getAsLong() : created;
             long lastModified = obj.has("lastModified") ? obj.get("lastModified").getAsLong() : lastAccessed;
             String contents = obj.has("contents") ? obj.get("contents").getAsString() : "";
+            Map<String, Integer> rawUpgrades = new HashMap<>();
+            if (obj.has("upgrades") && obj.get("upgrades").isJsonObject()) {
+                JsonObject upObj = obj.getAsJsonObject("upgrades");
+                for (Map.Entry<String, JsonElement> entry : upObj.entrySet()) {
+                    try {
+                        if (entry.getValue().isJsonPrimitive() && entry.getValue().getAsJsonPrimitive().isNumber()) {
+                            rawUpgrades.put(entry.getKey(), entry.getValue().getAsInt());
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+            ChestUpgrades upgrades = ChestUpgrades.fromSerializable(rawUpgrades);
             org.bukkit.inventory.Inventory inv = Bukkit.createInventory(null, type.getSize(), name);
             if (!contents.isEmpty()) {
                 ItemStackWrapper wrapper = fromBase64(contents);
@@ -239,7 +259,7 @@ public class DataStore {
                 }
             }
             BoundChest chest = new BoundChest(storageId != null ? storageId : owner.toString() + "-" + id,
-                    id, owner, name, type, loc, created, lastAccessed, lastModified, inv);
+                    id, owner, name, type, loc, created, lastAccessed, lastModified, inv, upgrades);
             if (obj.has("shared") && obj.get("shared").isJsonObject()) {
                 JsonObject sharedObj = obj.getAsJsonObject("shared");
                 for (Map.Entry<String, JsonElement> entry : sharedObj.entrySet()) {
