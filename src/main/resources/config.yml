@@ -4,3 +4,30 @@
 teleport-enabled: false
 holograms-enabled: true
 share-default-expiry-seconds: 0
+
+features:
+  chest-drops:
+    enabled: true
+
+    # When true, a player dropping items in front of their own linked chest
+    # automatically transfers items directly into that linked inventory.
+    # Only applies to chests the player owns.
+    # Valid interaction zone:
+    #   - 1 block directly in front
+    #   - 1 block front-left
+    #   - 1 block front-right
+
+    hologram:
+      # Show floating hologram messages above the chest when items are transferred.
+      enabled: true
+      duration: 7.0          # seconds
+      offset-y: 1.2
+
+    sounds:
+      enabled: true
+      deposit: "ENTITY_EXPERIENCE_ORB_PICKUP"
+
+    overflow:
+      behavior: "drop"      # drop | deny
+      # drop = excess items are dropped naturally
+      # deny = transfer fails if the linked chest is full
