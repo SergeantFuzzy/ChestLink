@@ -1,0 +1,43 @@
+# Upgrade configuration for ChestLink.
+# - enabled: toggle an upgrade globally.
+# - costs: per-level cost definitions. Each key is the level being unlocked.
+#   type: economy | items | xp | mixed
+#   amount: economy amount (for economy/mixed) OR xp levels if xp type.
+#   xp-levels: explicit xp cost (only for mixed/xp).
+#   items: material -> amount map.
+upgrades:
+  capacity:
+    enabled: true
+    costs:
+      1:
+        type: economy
+        amount: 500.0
+      2:
+        type: economy
+        amount: 1500.0
+      3:
+        type: economy
+        amount: 3000.0
+  sorting:
+    enabled: true
+    costs:
+      1:
+        type: mixed
+        amount: 750.0
+        xp-levels: 5
+        items:
+          hopper: 2
+  filter:
+    enabled: true
+    costs:
+      1:
+        type: items
+        items:
+          comparator: 4
+          redstone: 32
+  compression:
+    enabled: true
+    costs:
+      1:
+        type: xp
+        xp-levels: 15

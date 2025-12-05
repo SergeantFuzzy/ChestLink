@@ -11,6 +11,7 @@ import java.util.*;
 public class UpgradeRegistry {
     private final Map<String, ChestUpgrade> byKey = new LinkedHashMap<>();
     private final EnumMap<ChestUpgradeType, ChestUpgrade> byType = new EnumMap<>(ChestUpgradeType.class);
+    private UpgradeSettings settings;
 
     public void register(ChestUpgrade upgrade) {
         Objects.requireNonNull(upgrade, "upgrade");
@@ -46,6 +47,33 @@ public class UpgradeRegistry {
 
     public boolean isRegistered(ChestUpgradeType type) {
         return get(type) != null;
+    }
+
+    public void applySettings(UpgradeSettings settings) {
+        this.settings = settings;
+    }
+
+    public UpgradeConfigEntry configFor(ChestUpgradeType type) {
+        if (settings == null || type == null) {
+            return null;
+        }
+        return settings.get(type.getKey());
+    }
+
+    public boolean isEnabled(ChestUpgradeType type) {
+        if (type == null) return true;
+        if (settings == null) return true;
+        return settings.isEnabled(type.getKey());
+    }
+
+    public Collection<ChestUpgrade> enabledUpgrades() {
+        List<ChestUpgrade> upgrades = new ArrayList<>();
+        for (ChestUpgrade upgrade : byKey.values()) {
+            if (isEnabled(upgrade.getType())) {
+                upgrades.add(upgrade);
+            }
+        }
+        return upgrades;
     }
 
     public void registerDefaults() {
