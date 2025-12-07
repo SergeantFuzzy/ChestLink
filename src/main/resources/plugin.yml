@@ -43,6 +43,18 @@ permissions:
   chestlink.upgrades.manage.others:
     description: Manage upgrades on chests you do not own
     default: op
+  chestlink.upgrades.capacity:
+    description: Unlock or upgrade the Capacity upgrade
+    default: true
+  chestlink.upgrades.auto_sort:
+    description: Unlock or upgrade the Auto-Sort upgrade
+    default: true
+  chestlink.upgrades.filter:
+    description: Unlock or upgrade the Auto-Filter upgrade
+    default: true
+  chestlink.upgrades.compression:
+    description: Unlock or upgrade the Compression upgrade
+    default: true
   chestlink.tp:
     description: Teleport to bound chest
     default: op

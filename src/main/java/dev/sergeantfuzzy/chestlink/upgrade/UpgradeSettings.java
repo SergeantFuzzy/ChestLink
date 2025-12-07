@@ -19,17 +19,20 @@ public class UpgradeSettings {
     private final AutoSortSettings autoSortSettings;
     private final FilterSettings filterSettings;
     private final CompressionSettings compressionSettings;
+    private final UpgradeLimitSettings limitSettings;
 
     public UpgradeSettings(Map<String, UpgradeConfigEntry> entries,
                            CapacitySettings capacitySettings,
                            AutoSortSettings autoSortSettings,
                            FilterSettings filterSettings,
-                           CompressionSettings compressionSettings) {
+                           CompressionSettings compressionSettings,
+                           UpgradeLimitSettings limitSettings) {
         this.entries = entries == null ? Collections.emptyMap() : Collections.unmodifiableMap(entries);
         this.capacitySettings = capacitySettings == null ? CapacitySettings.empty() : capacitySettings;
         this.autoSortSettings = autoSortSettings == null ? AutoSortSettings.defaults() : autoSortSettings;
         this.filterSettings = filterSettings == null ? FilterSettings.defaults() : filterSettings;
         this.compressionSettings = compressionSettings == null ? CompressionSettings.defaults() : compressionSettings;
+        this.limitSettings = limitSettings == null ? UpgradeLimitSettings.disabled() : limitSettings;
     }
 
     public UpgradeConfigEntry get(String key) {
@@ -60,15 +63,19 @@ public class UpgradeSettings {
         return compressionSettings;
     }
 
+    public UpgradeLimitSettings getLimitSettings() {
+        return limitSettings;
+    }
+
     public static UpgradeSettings load(File dataFolder, Logger logger) {
         File file = new File(dataFolder, "upgrades.yml");
         if (!file.exists()) {
-            return new UpgradeSettings(Collections.emptyMap(), CapacitySettings.empty(), AutoSortSettings.defaults(), FilterSettings.defaults(), CompressionSettings.defaults());
+            return new UpgradeSettings(Collections.emptyMap(), CapacitySettings.empty(), AutoSortSettings.defaults(), FilterSettings.defaults(), CompressionSettings.defaults(), UpgradeLimitSettings.disabled());
         }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         ConfigurationSection root = config.getConfigurationSection("upgrades");
         if (root == null) {
-            return new UpgradeSettings(Collections.emptyMap(), CapacitySettings.empty(), AutoSortSettings.defaults(), FilterSettings.defaults(), CompressionSettings.defaults());
+            return new UpgradeSettings(Collections.emptyMap(), CapacitySettings.empty(), AutoSortSettings.defaults(), FilterSettings.defaults(), CompressionSettings.defaults(), UpgradeLimitSettings.disabled());
         }
 
         Map<String, UpgradeConfigEntry> entries = new HashMap<>();
@@ -76,6 +83,7 @@ public class UpgradeSettings {
         AutoSortSettings autoSort = AutoSortSettings.defaults();
         FilterSettings filterSettings = FilterSettings.defaults();
         CompressionSettings compressionSettings = CompressionSettings.defaults();
+        UpgradeLimitSettings limitSettings = UpgradeLimitSettings.disabled();
 
         for (String upgradeKey : root.getKeys(false)) {
             ConfigurationSection section = root.getConfigurationSection(upgradeKey);
@@ -113,7 +121,12 @@ public class UpgradeSettings {
             }
         }
 
-        return new UpgradeSettings(entries, capacity, autoSort, filterSettings, compressionSettings);
+        ConfigurationSection limitsSection = config.getConfigurationSection("limits");
+        if (limitsSection != null) {
+            limitSettings = UpgradeLimitSettings.fromSection(limitsSection, logger);
+        }
+
+        return new UpgradeSettings(entries, capacity, autoSort, filterSettings, compressionSettings, limitSettings);
     }
 
     private static String normalizeKey(String key) {

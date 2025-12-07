@@ -72,6 +72,18 @@ public class MessageService {
         messages.put("compression-returned", "&eCompressed blocks were returned to you due to lack of space.");
         messages.put("compression-dropped", "&eCompressed blocks were dropped nearby due to lack of space.");
         messages.put("compression-blocked", "&cCompression failed because there is no room for new blocks.");
+        // Upgrade localization
+        messages.put("upgrades.capacity.name", "&6Capacity Upgrade");
+        messages.put("upgrades.capacity.description", "&7Expand virtual storage beyond the base inventory.");
+        messages.put("upgrades.auto_sort.name", "&6Auto-Sort Upgrade");
+        messages.put("upgrades.auto_sort.description", "&7Automatically sorts the chest contents after new items arrive.");
+        messages.put("upgrades.filter.name", "&6Auto-Filter Upgrade");
+        messages.put("upgrades.filter.description", "&7Allow or deny items using whitelist/blacklist rules.");
+        messages.put("upgrades.compression.name", "&6Compression Upgrade");
+        messages.put("upgrades.compression.description", "&7Automatically crafts compressible items into their block forms.");
+        messages.put("upgrade-no-permission-upgrade", "&cYou do not have permission to unlock %upgrade%.");
+        messages.put("upgrade-limit-level", "&cYou cannot upgrade %upgrade% beyond level %limit%.");
+        messages.put("upgrade-limit-count", "&cYou have reached the limit of %limit% unlocked %upgrade% chests.");
     }
 
     public String getPrefix() {
@@ -90,6 +102,24 @@ public class MessageService {
 
     public void send(CommandSender sender, String path, Map<String, String> placeholders) {
         sender.sendMessage(msg(path, placeholders));
+    }
+
+    public String text(String path, Map<String, String> placeholders) {
+        String raw = messages.getOrDefault(path, path);
+        if (placeholders != null) {
+            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+                raw = raw.replace("%" + entry.getKey() + "%", entry.getValue());
+            }
+        }
+        return color(raw);
+    }
+
+    public String text(String path) {
+        return text(path, null);
+    }
+
+    public boolean has(String path) {
+        return messages.containsKey(path);
     }
 
     public void sendClickableRename(Player player, BoundChest chest, List<String> hoverLore) {
