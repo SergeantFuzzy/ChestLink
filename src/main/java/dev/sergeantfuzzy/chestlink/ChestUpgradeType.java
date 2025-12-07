@@ -8,7 +8,7 @@ import java.util.Locale;
  */
 public enum ChestUpgradeType {
     CAPACITY("capacity", "Capacity", 3, "Expand virtual storage beyond the base inventory."),
-    SORTING("sorting", "Auto-Sort", 1, "Automatically sorts contents after close."),
+    AUTO_SORT("auto_sort", "Auto-Sort", 1, "Automatically sorts contents after items are added."),
     FILTER("filter", "Auto-Filter", 1, "Filters incoming items by whitelist/blacklist rules."),
     COMPRESSION("compression", "Compression", 1, "Compress items into higher tiers when possible.");
 
@@ -44,7 +44,10 @@ public enum ChestUpgradeType {
         if (key == null) {
             return null;
         }
-        String normalized = key.trim().toLowerCase(Locale.ENGLISH);
+        String normalized = key.trim().toLowerCase(Locale.ENGLISH).replace('-', '_');
+        if ("sorting".equals(normalized)) {
+            normalized = "auto_sort";
+        }
         for (ChestUpgradeType type : values()) {
             if (type.key.equals(normalized)) {
                 return type;

@@ -23,6 +23,7 @@ public class MessageService {
         messages.put("usage-delete", "&eUsage: /chestlink delete <id|name>");
         messages.put("usage-share", "&eUsage: /chestlink share <id|name> <player>");
         messages.put("usage-info", "&eUsage: /chestlink info <id|name>");
+        messages.put("usage-upgrades", "&eUsage: /chestlink upgrades <id|name>");
         messages.put("usage-tp", "&eUsage: /chestlink tp <id|name>");
         messages.put("usage-admin", "&eUsage: /chestlink admin <list|open|wipe|delete|migrate|purgebroken> <player?> <id?>");
         messages.put("not-found", "&cNo linked chest found.");
@@ -45,6 +46,26 @@ public class MessageService {
         messages.put("admin-delete", "&cDeleted chest &6%id% &cfor &6%player%&c.");
         messages.put("admin-missing-id", "&cYou must specify a chest id or name.");
         messages.put("shared", "&aShared chest with &6%player% &aas &e%access%&a.");
+        messages.put("upgrade-disabled", "&cThat upgrade is disabled.");
+        messages.put("upgrade-owner-only", "&cOnly the owner can upgrade this chest.");
+        messages.put("upgrade-max-level", "&cThis upgrade is already at max level.");
+        messages.put("upgrade-no-economy", "&cEconomy support is unavailable for upgrade costs.");
+        messages.put("upgrade-no-funds", "&cYou need &6%amount% &cto purchase this upgrade.");
+        messages.put("upgrade-no-xp", "&cYou need &6%levels% &cxp levels for this upgrade.");
+        messages.put("upgrade-no-items", "&cMissing required items: &6%items%&c.");
+        messages.put("upgrade-success", "&aUpgraded &6%name% &ato level &e%level%&a.");
+        messages.put("filter-mode", "&aFilter mode set to &6%mode%.");
+        messages.put("filter-add", "&aAdded &6%item% &ato filter.");
+        messages.put("filter-add-none", "&cHold an item to add it to the filter.");
+        messages.put("filter-add-failed", "&cCannot add &6%item%&c (duplicate or limit reached).");
+        messages.put("filter-remove", "&eRemoved &6%item% &efrom filter.");
+        messages.put("filter-cleared", "&eCleared all filter entries.");
+        messages.put("filter-blocked", "&cThat item cannot enter this chest.");
+        messages.put("filter-returned", "&eDisallowed items were returned to you.");
+        messages.put("filter-dropped", "&eDisallowed items were dropped nearby.");
+        messages.put("compression-returned", "&eCompressed blocks were returned to you due to lack of space.");
+        messages.put("compression-dropped", "&eCompressed blocks were dropped nearby due to lack of space.");
+        messages.put("compression-blocked", "&cCompression failed because there is no room for new blocks.");
     }
 
     public String getPrefix() {

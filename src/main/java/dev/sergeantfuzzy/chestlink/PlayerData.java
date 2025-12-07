@@ -78,7 +78,8 @@ public class PlayerData {
         for (BoundChest chest : all) {
             String storageId = chest.getOwner().toString() + "-" + id;
             chests.put(id, new BoundChest(storageId, id, chest.getOwner(), chest.getName(), chest.getType(), chest.getLocation(),
-                    chest.getCreatedAt(), chest.getLastAccessed(), chest.getLastModified(), chest.getInventory(), chest.getUpgrades().copy()));
+                    chest.getCreatedAt(), chest.getLastAccessed(), chest.getLastModified(), chest.getInventory(),
+                    chest.getUpgrades().copy(), chest.getFilter().copy()));
             id++;
         }
         nextId = id;

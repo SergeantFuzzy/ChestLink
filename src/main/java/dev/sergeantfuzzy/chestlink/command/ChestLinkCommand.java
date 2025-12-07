@@ -7,6 +7,7 @@ import dev.sergeantfuzzy.chestlink.InventoryType;
 import dev.sergeantfuzzy.chestlink.PlayerData;
 import dev.sergeantfuzzy.chestlink.gui.InventoryMenu;
 import dev.sergeantfuzzy.chestlink.gui.ShareMenu;
+import dev.sergeantfuzzy.chestlink.gui.UpgradeMenu;
 import dev.sergeantfuzzy.chestlink.lang.MessageService;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -33,13 +34,15 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
     private MessageService messages;
     private InventoryMenu menu;
     private ShareMenu shareMenu;
+    private UpgradeMenu upgradeMenu;
 
-    public ChestLinkCommand(ChestLinkPlugin plugin, ChestLinkManager manager, MessageService messages, InventoryMenu menu, ShareMenu shareMenu) {
+    public ChestLinkCommand(ChestLinkPlugin plugin, ChestLinkManager manager, MessageService messages, InventoryMenu menu, ShareMenu shareMenu, UpgradeMenu upgradeMenu) {
         this.plugin = plugin;
         this.manager = manager;
         this.messages = messages;
         this.menu = menu;
         this.shareMenu = shareMenu;
+        this.upgradeMenu = upgradeMenu;
     }
 
     @Override
@@ -79,6 +82,9 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
                 return true;
             case "share":
                 handleShare(player, Arrays.copyOfRange(args, 1, args.length));
+                return true;
+            case "upgrades":
+                handleUpgrades(player, Arrays.copyOfRange(args, 1, args.length));
                 return true;
             case "info":
                 handleInfo(player, Arrays.copyOfRange(args, 1, args.length));
@@ -146,6 +152,9 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
         manager.sortInventory(chest.getInventory());
         chest.markAccessed();
         manager.saveInventory(chest);
+        if (manager.applyCapacity(chest)) {
+            manager.saveInventory(chest);
+        }
         player.openInventory(chest.getInventory());
     }
 
@@ -249,6 +258,23 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
         shareMenu.open(player, chest, targetId, targetName);
     }
 
+    private void handleUpgrades(Player player, String[] args) {
+        if (!player.hasPermission("chestlink.upgrades")) {
+            messages.send(player, "no-permission", null);
+            return;
+        }
+        if (args.length < 1) {
+            messages.send(player, "usage-upgrades", null);
+            return;
+        }
+        BoundChest chest = manager.getOwnedChest(player, args[0]);
+        if (chest == null) {
+            messages.send(player, "not-found", null);
+            return;
+        }
+        upgradeMenu.open(player, chest);
+    }
+
     private void handleInfo(Player player, String[] args) {
         if (args.length < 1) {
             messages.send(player, "usage-info", null);
@@ -262,7 +288,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
         Location loc = chest.getLocation();
         String locText = loc == null ? "Unknown" : (loc.getWorld().getName() + " (" + loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ() + ")");
         player.sendMessage(messages.color(messages.getPrefix() + "&eChest #" + chest.getId() + " &7- &6" + chest.getName()));
-        player.sendMessage(messages.color("&7Type: &6" + chest.getType().getDisplayName() + " &7Slots: &6" + chest.getType().getSize()));
+        player.sendMessage(messages.color("&7Type: &6" + chest.getType().getDisplayName() + " &7Slots: &6" + chest.getInventory().getSize()));
         player.sendMessage(messages.color("&7Created: &6" + new Date(chest.getCreatedAt())));
         player.sendMessage(messages.color("&7Location: &6" + locText));
     }
@@ -310,6 +336,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
         this.messages = plugin.messages();
         this.menu = plugin.menu();
         this.shareMenu = plugin.shareMenu();
+        this.upgradeMenu = plugin.upgradeMenu();
         sendReloadButton(player);
     }
 
@@ -354,8 +381,11 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
                 messages.send(player, "not-found", null);
                 return;
             }
+            if (manager.applyCapacity(chest)) {
+                manager.saveInventory(chest);
+            }
             if (readOnly) {
-                org.bukkit.inventory.Inventory copy = org.bukkit.Bukkit.createInventory(null, chest.getType().getSize(),
+                org.bukkit.inventory.Inventory copy = org.bukkit.Bukkit.createInventory(null, chest.getInventory().getSize(),
                         messages.color("&8Read-Only Admin View"));
                 copy.setContents(chest.getInventory().getContents());
                 player.openInventory(copy);
@@ -432,6 +462,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(messages.color("&6/chestlink reset <id|name>&7 - Wipe contents"));
         player.sendMessage(messages.color("&6/chestlink delete <id|name>&7 - Delete link"));
         player.sendMessage(messages.color("&6/chestlink share <id|name> <player>&7 - Share access to a chest"));
+        player.sendMessage(messages.color("&6/chestlink upgrades <id|name>&7 - Manage upgrades for a chest"));
         player.sendMessage(messages.color("&6/chestlink info <id|name>&7 - View details"));
         player.sendMessage(messages.color("&6/chestlink limits&7 - View your limits"));
         player.sendMessage(messages.color("&6/chestlink tp <id|name>&7 - Teleport to chest (if enabled)"));
@@ -464,7 +495,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
         List<BoundChest> owned = new ArrayList<>(data.getChests());
         List<BoundChest> accessible = manager.getAccessibleChests(player);
         if (args.length == 1) {
-            return Arrays.asList("bind", "open", "rename", "reset", "delete", "share", "info", "limits", "help", "tp", "admin", "reload");
+            return Arrays.asList("bind", "open", "rename", "reset", "delete", "share", "upgrades", "info", "limits", "help", "tp", "admin", "reload");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("admin")) {
             return Arrays.asList("list", "open", "wipe", "delete", "migrate", "purgebroken");
@@ -492,7 +523,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             if (Arrays.asList("open", "info", "tp").contains(sub)) {
                 return accessible.stream().map(c -> String.valueOf(c.getId())).collect(Collectors.toList());
             }
-            if (Arrays.asList("rename", "reset", "delete", "share").contains(sub)) {
+            if (Arrays.asList("rename", "reset", "delete", "share", "upgrades").contains(sub)) {
                 return owned.stream().map(c -> String.valueOf(c.getId())).collect(Collectors.toList());
             }
         }

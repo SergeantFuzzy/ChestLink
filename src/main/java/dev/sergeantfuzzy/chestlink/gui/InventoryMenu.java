@@ -75,7 +75,7 @@ public class InventoryMenu {
 
         List<String> lore = new ArrayList<>();
         lore.add(messages.color("&7Last Modified: &f" + dateFormat.format(new Date(chest.getLastModified()))));
-        lore.add(messages.color("&7Usage: &f" + chest.getUsedSlots() + "/" + chest.getType().getSize() + " Slots Used"));
+        lore.add(messages.color("&7Usage: &f" + chest.getUsedSlots() + "/" + chest.getInventory().getSize() + " Slots Used"));
         lore.add(messages.color("&7Owner: &f" + ownerName(chest.getOwner())));
         lore.add(messages.color("&7Shared With:"));
         if (chest.getShared().isEmpty()) {
@@ -124,6 +124,9 @@ public class InventoryMenu {
             if (!manager.canView(player, chest)) {
                 messages.send(player, "no-permission", null);
                 return;
+            }
+            if (manager.applyCapacity(chest)) {
+                manager.saveInventory(chest);
             }
             player.openInventory(chest.getInventory());
             chest.markAccessed();

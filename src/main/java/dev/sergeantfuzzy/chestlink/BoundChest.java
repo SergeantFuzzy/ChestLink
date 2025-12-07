@@ -1,5 +1,6 @@
 package dev.sergeantfuzzy.chestlink;
 
+import dev.sergeantfuzzy.chestlink.upgrade.FilterSettings;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -22,13 +23,20 @@ public class BoundChest {
     private long lastModified;
     private Inventory inventory;
     private final ChestUpgrades upgrades;
+    private ChestFilter filter;
     private final Map<UUID, SharedAccess> shared = new HashMap<>();
 
     public BoundChest(String storageId, int id, UUID owner, String name, InventoryType type, Location location, long createdAt, long lastAccessed, long lastModified, Inventory inventory) {
-        this(storageId, id, owner, name, type, location, createdAt, lastAccessed, lastModified, inventory, new ChestUpgrades());
+        this(storageId, id, owner, name, type, location, createdAt, lastAccessed, lastModified, inventory, new ChestUpgrades(), null);
     }
 
     public BoundChest(String storageId, int id, UUID owner, String name, InventoryType type, Location location, long createdAt, long lastAccessed, long lastModified, Inventory inventory, ChestUpgrades upgrades) {
+        this(storageId, id, owner, name, type, location, createdAt, lastAccessed, lastModified, inventory, upgrades, null);
+    }
+
+    public BoundChest(String storageId, int id, UUID owner, String name, InventoryType type, Location location,
+                      long createdAt, long lastAccessed, long lastModified, Inventory inventory,
+                      ChestUpgrades upgrades, ChestFilter filter) {
         this.storageId = storageId;
         this.id = id;
         this.owner = owner;
@@ -40,6 +48,7 @@ public class BoundChest {
         this.lastModified = lastModified;
         this.inventory = inventory;
         this.upgrades = upgrades != null ? upgrades : new ChestUpgrades();
+        this.filter = filter != null ? filter : defaultFilter();
     }
 
     public String getStorageId() {
@@ -99,8 +108,24 @@ public class BoundChest {
         return inventory;
     }
 
+    public void setInventory(Inventory inventory) {
+        this.inventory = inventory;
+    }
+
     public ChestUpgrades getUpgrades() {
         return upgrades;
+    }
+
+    public ChestFilter getFilter() {
+        if (filter == null) {
+            filter = defaultFilter();
+        }
+        return filter;
+    }
+
+    public void setFilter(ChestFilter filter) {
+        this.filter = filter != null ? filter : defaultFilter();
+        markModified();
     }
 
     public int getUpgradeLevel(ChestUpgradeType type) {
@@ -156,6 +181,12 @@ public class BoundChest {
                 upgradesSection.set(entry.getKey(), entry.getValue());
             }
         }
+        ChestFilter chestFilter = getFilter();
+        if (chestFilter != null) {
+            ConfigurationSection filterSection = section.createSection("filter");
+            filterSection.set("mode", chestFilter.getMode().name());
+            filterSection.set("items", chestFilter.serialize());
+        }
         ConfigurationSection sharedSection = section.createSection("shared");
         for (Map.Entry<UUID, SharedAccess> entry : shared.entrySet()) {
             ConfigurationSection s = sharedSection.createSection(entry.getKey().toString());
@@ -200,7 +231,8 @@ public class BoundChest {
             }
         }
         ChestUpgrades upgrades = ChestUpgrades.fromSerializable(upgradesRaw);
-        BoundChest bound = new BoundChest(storageId, id, owner, name, type, loc, created, lastAccess, lastModified, inv, upgrades);
+        ChestFilter filter = readFilter(section);
+        BoundChest bound = new BoundChest(storageId, id, owner, name, type, loc, created, lastAccess, lastModified, inv, upgrades, filter);
         ConfigurationSection sharedSection = section.getConfigurationSection("shared");
         if (sharedSection != null) {
             for (String key : sharedSection.getKeys(false)) {
@@ -217,6 +249,20 @@ public class BoundChest {
         }
         bound.pruneExpired();
         return bound;
+    }
+
+    private static ChestFilter readFilter(ConfigurationSection section) {
+        if (section == null) {
+            return null;
+        }
+        ConfigurationSection filterSection = section.getConfigurationSection("filter");
+        if (filterSection == null) {
+            return null;
+        }
+        FilterMode mode = FilterMode.from(filterSection.getString("mode", null),
+                ChestLinkPlugin.get().upgradeSettings().getFilterSettings().getDefaultMode());
+        List<String> rawItems = filterSection.getStringList("items");
+        return ChestFilter.fromSerialized(mode, rawItems);
     }
 
     public Map<UUID, SharedAccess> getShared() {
@@ -262,5 +308,10 @@ public class BoundChest {
             }
         }
         return used;
+    }
+
+    private ChestFilter defaultFilter() {
+        FilterSettings settings = ChestLinkPlugin.get().upgradeSettings().getFilterSettings();
+        return ChestFilter.empty(settings.getDefaultMode());
     }
 }

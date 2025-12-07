@@ -5,8 +5,10 @@ import dev.sergeantfuzzy.chestlink.ChestLinkManager;
 import dev.sergeantfuzzy.chestlink.ChestLinkPlugin;
 import dev.sergeantfuzzy.chestlink.InventoryType;
 import dev.sergeantfuzzy.chestlink.PlayerData;
+import dev.sergeantfuzzy.chestlink.gui.FilterMenu;
 import dev.sergeantfuzzy.chestlink.gui.InventoryMenu;
 import dev.sergeantfuzzy.chestlink.gui.ShareMenu;
+import dev.sergeantfuzzy.chestlink.gui.UpgradeMenu;
 import dev.sergeantfuzzy.chestlink.lang.MessageService;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -24,6 +26,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -43,13 +46,17 @@ public class ChestEventsListener implements Listener {
     private final MessageService messages;
     private final InventoryMenu menu;
     private final ShareMenu shareMenu;
+    private final UpgradeMenu upgradeMenu;
+    private final FilterMenu filterMenu;
 
-    public ChestEventsListener(ChestLinkPlugin plugin, ChestLinkManager manager, MessageService messages, InventoryMenu menu, ShareMenu shareMenu) {
+    public ChestEventsListener(ChestLinkPlugin plugin, ChestLinkManager manager, MessageService messages, InventoryMenu menu, ShareMenu shareMenu, UpgradeMenu upgradeMenu, FilterMenu filterMenu) {
         this.plugin = plugin;
         this.manager = manager;
         this.messages = messages;
         this.menu = menu;
         this.shareMenu = shareMenu;
+        this.upgradeMenu = upgradeMenu;
+        this.filterMenu = filterMenu;
     }
 
     @EventHandler
@@ -128,6 +135,7 @@ public class ChestEventsListener implements Listener {
                     messages.send(player, "no-permission", null);
                     return;
                 }
+                manager.applyCapacity(chest);
                 chest.markAccessed();
                 manager.saveInventory(chest);
                 player.openInventory(chest.getInventory());
@@ -167,15 +175,60 @@ public class ChestEventsListener implements Listener {
             }
             return;
         }
+        if (upgradeMenu.isUpgradeMenu(title)) {
+            event.setCancelled(true);
+            upgradeMenu.handleClick(player, event.getRawSlot());
+            return;
+        }
+        if (filterMenu.isFilterMenu(title)) {
+            event.setCancelled(true);
+            filterMenu.handleClick(player, event.getRawSlot(), event.getCurrentItem());
+            return;
+        }
         BoundChest chest = manager.getByInventory(top);
         if (chest != null) {
             if (!manager.canModify(player, chest)) {
                 event.setCancelled(true);
             } else {
                 chest.markModified();
+                manager.enforceFilter(chest, player);
+                manager.applyCompression(chest, player);
                 manager.saveInventory(chest);
+                manager.scheduleAutoSort(chest);
             }
         }
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        Inventory top = event.getView().getTopInventory();
+        if (top == null) {
+            return;
+        }
+        if (filterMenu.isFilterMenu(event.getView().getTitle())) {
+            event.setCancelled(true);
+            return;
+        }
+        BoundChest chest = manager.getByInventory(top);
+        if (chest == null) {
+            return;
+        }
+        boolean affectsTop = event.getRawSlots().stream().anyMatch(slot -> slot < top.getSize());
+        if (!affectsTop) {
+            return;
+        }
+        if (!manager.canModify(player, chest)) {
+            event.setCancelled(true);
+            return;
+        }
+        chest.markModified();
+        manager.enforceFilter(chest, player);
+        manager.applyCompression(chest, player);
+        manager.saveInventory(chest);
+        manager.scheduleAutoSort(chest);
     }
 
     @EventHandler
@@ -266,6 +319,12 @@ public class ChestEventsListener implements Listener {
         String title = event.getView().getTitle();
         if (shareMenu.isShareMenu(title)) {
             shareMenu.clear(player);
+        }
+        if (upgradeMenu.isUpgradeMenu(title)) {
+            upgradeMenu.clear(player);
+        }
+        if (filterMenu.isFilterMenu(title)) {
+            filterMenu.clear(player);
         }
         BoundChest chest = manager.getByInventory(inv);
         if (chest != null && manager.canModify(player, chest)) {

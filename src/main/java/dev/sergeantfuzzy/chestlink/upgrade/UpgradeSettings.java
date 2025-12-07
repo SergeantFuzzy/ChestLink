@@ -4,6 +4,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -14,13 +15,27 @@ import java.util.logging.Logger;
  */
 public class UpgradeSettings {
     private final Map<String, UpgradeConfigEntry> entries;
+    private final CapacitySettings capacitySettings;
+    private final AutoSortSettings autoSortSettings;
+    private final FilterSettings filterSettings;
+    private final CompressionSettings compressionSettings;
 
-    public UpgradeSettings(Map<String, UpgradeConfigEntry> entries) {
-        this.entries = entries;
+    public UpgradeSettings(Map<String, UpgradeConfigEntry> entries,
+                           CapacitySettings capacitySettings,
+                           AutoSortSettings autoSortSettings,
+                           FilterSettings filterSettings,
+                           CompressionSettings compressionSettings) {
+        this.entries = entries == null ? Collections.emptyMap() : Collections.unmodifiableMap(entries);
+        this.capacitySettings = capacitySettings == null ? CapacitySettings.empty() : capacitySettings;
+        this.autoSortSettings = autoSortSettings == null ? AutoSortSettings.defaults() : autoSortSettings;
+        this.filterSettings = filterSettings == null ? FilterSettings.defaults() : filterSettings;
+        this.compressionSettings = compressionSettings == null ? CompressionSettings.defaults() : compressionSettings;
     }
 
     public UpgradeConfigEntry get(String key) {
-        if (key == null) return null;
+        if (key == null) {
+            return null;
+        }
         return entries.get(key.toLowerCase(Locale.ENGLISH));
     }
 
@@ -29,19 +44,43 @@ public class UpgradeSettings {
         return entry == null || entry.isEnabled();
     }
 
+    public CapacitySettings getCapacitySettings() {
+        return capacitySettings;
+    }
+
+    public AutoSortSettings getAutoSortSettings() {
+        return autoSortSettings;
+    }
+
+    public FilterSettings getFilterSettings() {
+        return filterSettings;
+    }
+
+    public CompressionSettings getCompressionSettings() {
+        return compressionSettings;
+    }
+
     public static UpgradeSettings load(File dataFolder, Logger logger) {
         File file = new File(dataFolder, "upgrades.yml");
+        if (!file.exists()) {
+            return new UpgradeSettings(Collections.emptyMap(), CapacitySettings.empty(), AutoSortSettings.defaults(), FilterSettings.defaults(), CompressionSettings.defaults());
+        }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         ConfigurationSection root = config.getConfigurationSection("upgrades");
         if (root == null) {
-            root = config;
+            return new UpgradeSettings(Collections.emptyMap(), CapacitySettings.empty(), AutoSortSettings.defaults(), FilterSettings.defaults(), CompressionSettings.defaults());
         }
 
         Map<String, UpgradeConfigEntry> entries = new HashMap<>();
+        CapacitySettings capacity = CapacitySettings.empty();
+        AutoSortSettings autoSort = AutoSortSettings.defaults();
+        FilterSettings filterSettings = FilterSettings.defaults();
+        CompressionSettings compressionSettings = CompressionSettings.defaults();
 
         for (String upgradeKey : root.getKeys(false)) {
             ConfigurationSection section = root.getConfigurationSection(upgradeKey);
             if (section == null) continue;
+            String normalizedKey = normalizeKey(upgradeKey);
             boolean enabled = section.getBoolean("enabled", true);
 
             Map<Integer, UpgradeCost> costs = new HashMap<>();
@@ -61,9 +100,27 @@ public class UpgradeSettings {
             if (costs.isEmpty()) {
                 logger.warning("[ChestLink] No costs configured for upgrade '" + upgradeKey + "'. Defaulting to free.");
             }
-            entries.put(upgradeKey.toLowerCase(Locale.ENGLISH), new UpgradeConfigEntry(enabled, costs));
+            entries.put(normalizedKey, new UpgradeConfigEntry(enabled, costs));
+
+            if ("capacity".equals(normalizedKey)) {
+                capacity = CapacitySettings.fromSection(section, logger);
+            } else if ("auto_sort".equals(normalizedKey)) {
+                autoSort = AutoSortSettings.fromSection(section, logger);
+            } else if ("filter".equals(normalizedKey)) {
+                filterSettings = FilterSettings.fromSection(section);
+            } else if ("compression".equals(normalizedKey)) {
+                compressionSettings = CompressionSettings.fromSection(section, logger);
+            }
         }
 
-        return new UpgradeSettings(entries);
+        return new UpgradeSettings(entries, capacity, autoSort, filterSettings, compressionSettings);
+    }
+
+    private static String normalizeKey(String key) {
+        String normalized = key.toLowerCase(Locale.ENGLISH);
+        if ("sorting".equals(normalized)) {
+            return "auto_sort";
+        }
+        return normalized;
     }
 }
