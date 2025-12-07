@@ -76,8 +76,17 @@ public class BoundChest {
      */
     public void renameInventory(String newName) {
         this.name = newName;
-        Inventory newInventory = Bukkit.createInventory(null, type.getSize(), newName);
-        newInventory.setContents(inventory.getContents());
+        int size = inventory != null ? inventory.getSize() : type.getSize();
+        if (size < 9) {
+            size = 9;
+        } else if (size % 9 != 0) {
+            size = ((size / 9) + 1) * 9;
+        }
+        Inventory newInventory = Bukkit.createInventory(null, size, newName);
+        if (inventory != null) {
+            ItemStack[] contents = Arrays.copyOf(inventory.getContents(), size);
+            newInventory.setContents(contents);
+        }
         this.inventory = newInventory;
     }
 

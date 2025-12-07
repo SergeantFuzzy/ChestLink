@@ -86,12 +86,25 @@ public class ChestDropListener implements Listener {
         toStore.setAmount(movedAmount);
         Map<Integer, ItemStack> leftover = targetInv.addItem(toStore);
         int moved = toStore.getAmount() - sumAmounts(leftover);
+        boolean changed = moved > 0;
         if (moved > 0) {
             chest.markModified();
-            manager.saveInventory(chest);
             handleSuccess(player, chest, toStore, moved);
         }
         handleOverflow(player, leftover, event.getItemDrop().getLocation());
+        boolean filtered = manager.enforceFilter(chest, player);
+        if (filtered) {
+            chest.markModified();
+            changed = true;
+        }
+        boolean compressed = manager.applyCompression(chest, player);
+        if (compressed) {
+            changed = true;
+        }
+        if (changed) {
+            manager.saveInventory(chest);
+            manager.scheduleAutoSort(chest);
+        }
     }
 
     private BoundChest findOwnedChest(Player player) {

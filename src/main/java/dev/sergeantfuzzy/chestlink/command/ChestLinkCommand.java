@@ -149,12 +149,10 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             messages.send(player, "no-permission", null);
             return;
         }
-        manager.sortInventory(chest.getInventory());
+        manager.applyCapacity(chest);
+        manager.applyAutoSort(chest);
         chest.markAccessed();
         manager.saveInventory(chest);
-        if (manager.applyCapacity(chest)) {
-            manager.saveInventory(chest);
-        }
         player.openInventory(chest.getInventory());
     }
 
@@ -259,7 +257,7 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleUpgrades(Player player, String[] args) {
-        if (!player.hasPermission("chestlink.upgrades")) {
+        if (!hasUpgradeUsePermission(player)) {
             messages.send(player, "no-permission", null);
             return;
         }
@@ -268,8 +266,15 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             return;
         }
         BoundChest chest = manager.getOwnedChest(player, args[0]);
+        if (chest == null && senderHasManageOthers(player)) {
+            chest = manager.getAccessibleChest(player, args[0]);
+        }
         if (chest == null) {
             messages.send(player, "not-found", null);
+            return;
+        }
+        if (!player.getUniqueId().equals(chest.getOwner()) && !senderHasManageOthers(player)) {
+            messages.send(player, "no-permission", null);
             return;
         }
         upgradeMenu.open(player, chest);
@@ -524,6 +529,9 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
                 return accessible.stream().map(c -> String.valueOf(c.getId())).collect(Collectors.toList());
             }
             if (Arrays.asList("rename", "reset", "delete", "share", "upgrades").contains(sub)) {
+                if (sub.equals("upgrades") && senderHasManageOthers(player)) {
+                    return accessible.stream().map(c -> String.valueOf(c.getId())).collect(Collectors.toList());
+                }
                 return owned.stream().map(c -> String.valueOf(c.getId())).collect(Collectors.toList());
             }
         }
@@ -531,6 +539,22 @@ public class ChestLinkCommand implements CommandExecutor, TabCompleter {
             return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
         }
         return Collections.emptyList();
+    }
+
+    private boolean hasUpgradeUsePermission(Player player) {
+        if (player == null) {
+            return false;
+        }
+        return player.hasPermission("chestlink.upgrades.use")
+                || player.hasPermission("chestlink.upgrades");
+    }
+
+    private boolean senderHasManageOthers(Player player) {
+        if (player == null) {
+            return false;
+        }
+        return player.hasPermission("chestlink.upgrades.manage.others")
+                || player.hasPermission("chestlink.admin");
     }
 
     private void sendReloadButton(Player player) {

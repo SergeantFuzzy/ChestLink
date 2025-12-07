@@ -32,10 +32,11 @@ import java.util.stream.Collectors;
 public class UpgradeMenu {
     private static final String TITLE = "&8Chest Upgrades";
     private static final int MENU_SIZE = 27;
-    private static final Map<Integer, ChestUpgradeType> BUTTON_SLOTS = Map.of(
-            11, ChestUpgradeType.CAPACITY,
-            13, ChestUpgradeType.AUTO_SORT,
-            15, ChestUpgradeType.FILTER
+    private static final Map<Integer, ChestUpgradeType> BUTTON_SLOTS = Map.ofEntries(
+            Map.entry(10, ChestUpgradeType.CAPACITY),
+            Map.entry(12, ChestUpgradeType.AUTO_SORT),
+            Map.entry(14, ChestUpgradeType.FILTER),
+            Map.entry(16, ChestUpgradeType.COMPRESSION)
     );
     private final ChestLinkPlugin plugin;
     private final ChestLinkManager manager;
@@ -127,7 +128,7 @@ public class UpgradeMenu {
                 if (level > 0) {
                     lore.add(messages.color("&aActive recipes:"));
                     plugin.upgradeSettings().getCompressionSettings().recipes().forEach((input, output) ->
-                            lore.add(messages.color("&8 - &f" + formatMaterial(input) + " &7→ &f" + formatMaterial(output))));
+                            lore.add(messages.color("&8 - &f" + formatMaterial(input) + " &7-> &f" + formatMaterial(output))));
                 }
             }
             case FILTER -> {
@@ -182,6 +183,8 @@ public class UpgradeMenu {
             manager.applyCapacity(chest);
         } else if (type == ChestUpgradeType.AUTO_SORT) {
             manager.applyAutoSort(chest);
+        } else if (type == ChestUpgradeType.COMPRESSION) {
+            manager.applyCompression(chest, player);
         }
         manager.saveInventory(chest);
         manager.save(player);
