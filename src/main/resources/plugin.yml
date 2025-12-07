@@ -35,8 +35,14 @@ permissions:
     description: Share linked chests with other players
     default: true
   chestlink.upgrades:
-    description: Upgrade linked chests
+    description: Legacy permission for upgrade access (use chestlink.upgrades.use instead)
     default: true
+  chestlink.upgrades.use:
+    description: Access the /chestlink upgrades menu for owned chests
+    default: true
+  chestlink.upgrades.manage.others:
+    description: Manage upgrades on chests you do not own
+    default: op
   chestlink.tp:
     description: Teleport to bound chest
     default: op

@@ -210,6 +210,18 @@ public class InventoryMenu {
         return org.bukkit.ChatColor.stripColor(title).equalsIgnoreCase(org.bukkit.ChatColor.stripColor(messages.color(CONFIRM_TITLE)));
     }
 
+    public List<String> describeChest(BoundChest chest) {
+        if (chest == null) {
+            return Collections.emptyList();
+        }
+        ItemStack icon = toIcon(chest);
+        ItemMeta meta = icon.getItemMeta();
+        if (meta == null || meta.getLore() == null) {
+            return Collections.emptyList();
+        }
+        return new ArrayList<>(meta.getLore());
+    }
+
     private record DeleteContext(BoundChest chest, int page) {
     }
 }
