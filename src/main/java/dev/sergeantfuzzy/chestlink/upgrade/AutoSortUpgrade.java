@@ -5,6 +5,6 @@ import org.bukkit.Material;
 
 public class AutoSortUpgrade extends AbstractChestUpgrade {
     public AutoSortUpgrade() {
-        super(ChestUpgradeType.SORTING, Material.HOPPER);
+        super(ChestUpgradeType.AUTO_SORT, Material.HOPPER);
     }
 }

@@ -8,6 +8,11 @@
 upgrades:
   capacity:
     enabled: true
+    max-slots: 72
+    levels:
+      1: 63
+      2: 72
+      3: 72
     costs:
       1:
         type: economy
@@ -18,8 +23,9 @@ upgrades:
       3:
         type: economy
         amount: 3000.0
-  sorting:
+  auto_sort:
     enabled: true
+    strategy: alphabetical
     costs:
       1:
         type: mixed
@@ -29,6 +35,9 @@ upgrades:
           hopper: 2
   filter:
     enabled: true
+    default-mode: blacklist
+    overflow-behavior: return
+    max-entries: 27
     costs:
       1:
         type: items
@@ -37,6 +46,15 @@ upgrades:
           redstone: 32
   compression:
     enabled: true
+    recipes:
+      iron_ingot: iron_block
+      gold_ingot: gold_block
+      coal: coal_block
+      redstone: redstone_block
+      diamond: diamond_block
+      emerald: emerald_block
+      lapis_lazuli: lapis_block
+      copper_ingot: copper_block
     costs:
       1:
         type: xp

@@ -8,10 +8,13 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.sergeantfuzzy.chestlink.AccessLevel;
 import dev.sergeantfuzzy.chestlink.BoundChest;
+import dev.sergeantfuzzy.chestlink.ChestFilter;
 import dev.sergeantfuzzy.chestlink.ChestUpgrades;
 import dev.sergeantfuzzy.chestlink.InventoryType;
 import dev.sergeantfuzzy.chestlink.PlayerData;
 import dev.sergeantfuzzy.chestlink.SharedAccess;
+import dev.sergeantfuzzy.chestlink.ChestLinkPlugin;
+import dev.sergeantfuzzy.chestlink.FilterMode;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
@@ -29,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -165,6 +169,15 @@ public class DataStore {
             upgrades.addProperty(entry.getKey(), entry.getValue());
         }
         obj.add("upgrades", upgrades);
+        ChestFilter filter = chest.getFilter();
+        if (filter != null) {
+            JsonObject filterObj = new JsonObject();
+            filterObj.addProperty("mode", filter.getMode().name().toLowerCase());
+            JsonArray items = new JsonArray();
+            filter.getEntries().forEach(material -> items.add(material.name().toLowerCase()));
+            filterObj.add("items", items);
+            obj.add("filter", filterObj);
+        }
         obj.addProperty("contents", inventoryToBase64(chest.getInventory()));
         writeJson(inventoryFile(chest.getStorageId()), obj);
     }
@@ -251,15 +264,22 @@ public class DataStore {
                 }
             }
             ChestUpgrades upgrades = ChestUpgrades.fromSerializable(rawUpgrades);
-            org.bukkit.inventory.Inventory inv = Bukkit.createInventory(null, type.getSize(), name);
+            int targetSize = type.getSize();
+            ItemStackWrapper wrapper = null;
             if (!contents.isEmpty()) {
-                ItemStackWrapper wrapper = fromBase64(contents);
-                if (wrapper != null && wrapper.contents.length == inv.getSize()) {
-                    inv.setContents(wrapper.contents);
+                wrapper = fromBase64(contents);
+                if (wrapper != null && wrapper.contents != null) {
+                    targetSize = Math.max(targetSize, normalizeInventorySize(wrapper.contents.length));
                 }
             }
+            org.bukkit.inventory.Inventory inv = Bukkit.createInventory(null, targetSize, name);
+            if (wrapper != null && wrapper.contents != null) {
+                org.bukkit.inventory.ItemStack[] applied = Arrays.copyOf(wrapper.contents, targetSize);
+                inv.setContents(applied);
+            }
+            ChestFilter filter = readFilter(obj);
             BoundChest chest = new BoundChest(storageId != null ? storageId : owner.toString() + "-" + id,
-                    id, owner, name, type, loc, created, lastAccessed, lastModified, inv, upgrades);
+                    id, owner, name, type, loc, created, lastAccessed, lastModified, inv, upgrades, filter);
             if (obj.has("shared") && obj.get("shared").isJsonObject()) {
                 JsonObject sharedObj = obj.getAsJsonObject("shared");
                 for (Map.Entry<String, JsonElement> entry : sharedObj.entrySet()) {
@@ -280,6 +300,39 @@ public class DataStore {
             e.printStackTrace();
             return null;
         }
+    }
+
+    private ChestFilter readFilter(JsonObject obj) {
+        if (obj == null || !obj.has("filter") || !obj.get("filter").isJsonObject()) {
+            return null;
+        }
+        JsonObject filterObj = obj.getAsJsonObject("filter");
+        FilterMode mode = FilterMode.from(filterObj.has("mode") ? filterObj.get("mode").getAsString() : null,
+                ChestLinkPlugin.get().upgradeSettings().getFilterSettings().getDefaultMode());
+        List<String> serialized = new ArrayList<>();
+        if (filterObj.has("items") && filterObj.get("items").isJsonArray()) {
+            for (JsonElement el : filterObj.getAsJsonArray("items")) {
+                if (el.isJsonPrimitive()) {
+                    serialized.add(el.getAsString());
+                }
+            }
+        }
+        return ChestFilter.fromSerialized(mode, serialized);
+    }
+
+    private int normalizeInventorySize(int size) {
+        if (size <= 0) {
+            return 9;
+        }
+        int normalized = size - (size % 9);
+        if (normalized <= 0) {
+            normalized = 9;
+        }
+        int max = 9 * 9;
+        if (normalized > max) {
+            return max;
+        }
+        return normalized;
     }
 
     private void writeJson(File target, JsonObject obj) {
