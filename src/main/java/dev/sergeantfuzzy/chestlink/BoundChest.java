@@ -71,6 +71,16 @@ public class BoundChest {
         this.name = name;
     }
 
+    /**
+     * Renames the chest and rebuilds the backing inventory so the title shown to players is updated.
+     */
+    public void renameInventory(String newName) {
+        this.name = newName;
+        Inventory newInventory = Bukkit.createInventory(null, type.getSize(), newName);
+        newInventory.setContents(inventory.getContents());
+        this.inventory = newInventory;
+    }
+
     public InventoryType getType() {
         return type;
     }

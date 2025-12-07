@@ -213,6 +213,19 @@ public class ChestLinkManager {
         return inventoryLookup.get(inventory);
     }
 
+    public void renameChest(Player player, BoundChest chest, String newName) {
+        if (player == null || chest == null || newName == null || newName.isEmpty()) {
+            return;
+        }
+        Inventory oldInv = chest.getInventory();
+        chest.renameInventory(newName);
+        inventoryLookup.remove(oldInv);
+        inventoryLookup.put(chest.getInventory(), chest);
+        chest.markModified();
+        saveInventory(chest);
+        save(player);
+    }
+
     public void shareChest(BoundChest chest, UUID target, AccessLevel level, Long expires) {
         chest.setSharedAccess(target, new SharedAccess(level, expires));
         chest.markModified();

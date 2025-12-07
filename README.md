@@ -57,6 +57,12 @@ If you encounter an issue:
 
 ---
 
+📌 [Ideas & Roadmap](./ROADMAP.md)
+
+🗺️ [Project Board](https://github.com/users/SergeantFuzzy/projects/6)
+
+---
+
 ### ⭐ Enjoying ChestLink?
 Star the repository to support further development!
 
