@@ -59,3 +59,15 @@ upgrades:
       1:
         type: xp
         xp-levels: 15
+limits:
+  enabled: false
+  ranks:
+    default:
+      permission:
+      max-upgraded-chests: -1
+      bypass-limits: false
+      max-levels:
+        capacity: 3
+        auto_sort: 1
+        filter: 1
+        compression: 1

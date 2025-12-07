@@ -9,6 +9,7 @@ import dev.sergeantfuzzy.chestlink.upgrade.CapacitySettings;
 import dev.sergeantfuzzy.chestlink.upgrade.FilterSettings;
 import dev.sergeantfuzzy.chestlink.upgrade.UpgradeConfigEntry;
 import dev.sergeantfuzzy.chestlink.upgrade.UpgradeCost;
+import dev.sergeantfuzzy.chestlink.upgrade.UpgradeLimitSettings;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
@@ -100,11 +101,12 @@ public class UpgradeMenu {
         }
         ItemStack item = new ItemStack(icon);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(messages.color("&6" + type.getDisplayName()));
+        meta.setDisplayName(upgradeName(type));
         List<String> lore = new ArrayList<>();
         int level = chest.getUpgradeLevel(type);
         int max = type.getMaxLevel();
         lore.add(messages.color("&7Level: &e" + level + "&7/&e" + max));
+        addDescriptionLore(lore, type);
         switch (type) {
             case CAPACITY -> {
                 lore.add(messages.color("&7Current Size: &f" + chest.getInventory().getSize() + " slots"));
@@ -160,6 +162,7 @@ public class UpgradeMenu {
     }
 
     private boolean attemptUpgrade(Player player, BoundChest chest, ChestUpgradeType type) {
+        String upgradeName = ChatColor.stripColor(upgradeName(type));
         if (!player.getUniqueId().equals(chest.getOwner())) {
             messages.send(player, "upgrade-owner-only", null);
             return false;
@@ -168,11 +171,33 @@ public class UpgradeMenu {
             messages.send(player, "upgrade-disabled", null);
             return false;
         }
+        if (!player.hasPermission("chestlink.upgrades." + type.getKey())) {
+            messages.send(player, "upgrade-no-permission-upgrade", Map.of("upgrade", upgradeName));
+            return false;
+        }
         int level = chest.getUpgradeLevel(type);
         int max = type.getMaxLevel();
         if (level >= max) {
             messages.send(player, "upgrade-max-level", null);
             return false;
+        }
+        UpgradeLimitSettings limits = plugin.upgradeSettings().getLimitSettings();
+        if (limits.isEnabled() && !limits.canBypass(player)) {
+            int maxLevel = limits.maxLevel(player, type);
+            if (maxLevel > 0 && level >= maxLevel) {
+                messages.send(player, "upgrade-limit-level", Map.of("upgrade", upgradeName, "limit", String.valueOf(maxLevel)));
+                return false;
+            }
+            int maxChests = limits.maxUpgradedChests(player);
+            if (maxChests > 0 && level == 0) {
+                long unlocked = manager.getData(player).getChests().stream()
+                        .filter(c -> c.getUpgradeLevel(type) > 0)
+                        .count();
+                if (unlocked >= maxChests) {
+                    messages.send(player, "upgrade-limit-count", Map.of("upgrade", upgradeName, "limit", String.valueOf(maxChests)));
+                    return false;
+                }
+            }
         }
         UpgradeCost cost = costForLevel(type, level + 1);
         if (!processPayment(player, cost)) {
@@ -335,5 +360,24 @@ public class UpgradeMenu {
                     .append(" ");
         }
         return builder.toString().trim();
+    }
+
+    private String translationKey(ChestUpgradeType type, String suffix) {
+        return "upgrades." + type.getKey() + "." + suffix;
+    }
+
+    private String upgradeName(ChestUpgradeType type) {
+        String key = translationKey(type, "name");
+        if (messages.has(key)) {
+            return messages.text(key);
+        }
+        return messages.color("&6" + type.getDisplayName());
+    }
+
+    private void addDescriptionLore(List<String> lore, ChestUpgradeType type) {
+        String key = translationKey(type, "description");
+        if (messages.has(key)) {
+            lore.add(messages.text(key));
+        }
     }
 }
