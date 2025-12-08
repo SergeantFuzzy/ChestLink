@@ -4,7 +4,7 @@ main: dev.sergeantfuzzy.chestlink.ChestLinkPlugin
 api-version: 1.20
 description: Turn any chest you place into a portable virtual inventory accessible from any world.
 authors: [SergeantFuzzy]
-softdepend: [Vault]
+softdepend: [VaultUnlocked, Vault, Essentials, EssentialsX, TheNewEconomy]
 commands:
   chestlink:
     description: ChestLink main command
