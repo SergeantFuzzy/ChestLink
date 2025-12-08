@@ -1,8 +1,11 @@
 # Configuration Notes:
 # - teleport-enabled: allows /chestlink tp to teleport players to the bound chest location.
 # - holograms-enabled: toggles success/failure holograms when binding a chest.
+# - safe-placement-enabled: when true, prevents binding in dangerous spots (rain/lava/pistons/etc). When false, chests can be placed anywhere.
+# - share-default-expiry-seconds: default duration (seconds) for shared access. 0 disables auto-expiry.
 teleport-enabled: false
 holograms-enabled: true
+safe-placement-enabled: false
 share-default-expiry-seconds: 0
 
 features:
