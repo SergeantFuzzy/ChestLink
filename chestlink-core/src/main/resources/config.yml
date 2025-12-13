@@ -1,0 +1,73 @@
+# =========================================================================
+#
+#     ██████ ██   ██ ███████ ███████ ████████ ██      ██ ███    ██ ██   ██
+#    ██      ██   ██ ██      ██         ██    ██      ██ ████   ██ ██  ██
+#    ██      ███████ █████   ███████    ██    ██      ██ ██ ██  ██ █████
+#    ██      ██   ██ ██           ██    ██    ██      ██ ██  ██ ██ ██  ██
+#     ██████ ██   ██ ███████ ███████    ██    ███████ ██ ██   ████ ██   ██
+#
+#
+# =========================================================================
+# ChestLink configuration v1.1
+#
+# Use 'true / false' to toggle features.
+# Restart or '/chestlink reload' to apply.
+# =========================================================================
+
+config-version: 1.1
+
+# Update notifications
+update-notifications:
+  # Master toggle that controls all update checks and notifications.
+  # Set to false to disable every update-related network call and message.
+  enabled: true
+
+  # Controls whether the plugin checks Spigot/GitHub for new versions.
+  check-enabled: true
+
+  # Controls whether OPs are notified when they join the server.
+  # This is also gated by the master toggle above.
+  player-notify-enabled: true
+
+# Gameplay toggles
+teleport-enabled: false        # Enables '/chestlink tp' to warp to your bound chest.
+holograms-enabled: true        # Shows holograms when binding succeeds/fails.
+safe-placement-enabled: false  # Blocks binding in dangerous spots (lava/pistons/etc). Set false to allow anywhere.
+
+# Sharing defaults
+share-default-expiry-seconds: 0   # How long shares last (seconds). 0 = never auto-expire.
+
+features:
+  chest-drops:
+    # Auto-transfer items dropped in front of your own linked chest.
+    enabled: true
+
+    # Visual feedback above the chest when items transfer.
+    hologram:
+      enabled: true
+      duration: 7.0          # Seconds the hologram stays visible.
+      offset-y: 1.2          # Vertical offset from the chest top.
+
+    # Sound feedback on successful transfers.
+    sounds:
+      enabled: true
+      deposit: "ENTITY_EXPERIENCE_ORB_PICKUP"
+
+    overflow:
+      # drop = extra items fall on the ground
+      # deny = transfer fails if the chest is full
+      behavior: "drop"
+
+license:
+  key: ""
+  status: "UNLICENSED"
+  server-id: ""
+
+# =========================================================================
+#      _____ _   _ ____     ___  _____   _____ ___ _     _____
+#     | ____| \ | |  _ \   / _ \|  ___| |  ___|_ _| |   | ____|
+#     |  _| |  \| | | | | | | | | |_    | |_   | || |   |  _|
+#     | |___| |\  | |_| | | |_| |  _|   |  _|  | || |___| |___
+#     |_____|_| \_|____/   \___/|_|     |_|   |___|_____|_____|
+#
+# =========================================================================

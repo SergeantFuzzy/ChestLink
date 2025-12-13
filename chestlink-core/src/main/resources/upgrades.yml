@@ -1,0 +1,74 @@
+# Upgrade configuration for ChestLink.
+# - enabled: toggle an upgrade globally.
+# - costs: per-level cost definitions. Each key is the level being unlocked.
+#   type: economy | items | xp | mixed
+#   amount: economy amount (for economy/mixed) OR xp levels if xp type.
+#   xp-levels: explicit xp cost (only for mixed/xp).
+#   items: material -> amount map.
+upgrades:
+  capacity:
+    enabled: true
+    max-slots: -1
+    levels:
+      1: 36
+      2: 45
+      3: 54
+    double-levels:
+      1: 63
+      2: 72
+      3: 81
+    costs:
+      1:
+        type: economy
+        amount: 500.0
+      2:
+        type: economy
+        amount: 1500.0
+      3:
+        type: economy
+        amount: 3000.0
+  auto_sort:
+    enabled: true
+    strategy: alphabetical
+    costs:
+      1:
+        type: economy
+        amount: 750.0
+  filter:
+    enabled: true
+    default-mode: blacklist
+    overflow-behavior: return
+    max-entries: 27
+    costs:
+      1:
+        type: items
+        items:
+          comparator: 4
+          redstone: 32
+  compression:
+    enabled: true
+    recipes:
+      iron_ingot: iron_block
+      gold_ingot: gold_block
+      coal: coal_block
+      redstone: redstone_block
+      diamond: diamond_block
+      emerald: emerald_block
+      lapis_lazuli: lapis_block
+      copper_ingot: copper_block
+    costs:
+      1:
+        type: xp
+        xp-levels: 15
+limits:
+  enabled: false
+  ranks:
+    default:
+      permission:
+      max-upgraded-chests: -1
+      bypass-limits: false
+      max-levels:
+        capacity: 3
+        auto_sort: 1
+        filter: 1
+        compression: 1
