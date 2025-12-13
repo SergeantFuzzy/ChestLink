@@ -1,27 +1,25 @@
 package dev.sergeantfuzzy.chestlink;
 
-import dev.sergeantfuzzy.chestlink.core.ChestLinkManager;
-import dev.sergeantfuzzy.chestlink.platform.command.ChestLinkCommand;
-import dev.sergeantfuzzy.chestlink.platform.gui.FilterMenu;
-import dev.sergeantfuzzy.chestlink.platform.gui.InventoryMenu;
-import dev.sergeantfuzzy.chestlink.platform.gui.ShareMenu;
-import dev.sergeantfuzzy.chestlink.platform.gui.UpgradeMenu;
-import dev.sergeantfuzzy.chestlink.localization.MessageService;
-import dev.sergeantfuzzy.chestlink.platform.economy.EconomyBridge;
-import dev.sergeantfuzzy.chestlink.platform.listener.ChestEventsListener;
-import dev.sergeantfuzzy.chestlink.platform.listener.EconomyServiceListener;
-import dev.sergeantfuzzy.chestlink.platform.placeholder.ChestLinkPlaceholder;
-import dev.sergeantfuzzy.chestlink.core.storage.DataStore;
-import dev.sergeantfuzzy.chestlink.features.upgrade.UpgradeRegistry;
-import dev.sergeantfuzzy.chestlink.features.upgrade.UpgradeSettings;
+import dev.sergeantfuzzy.chestlink.command.ChestLinkCommand;
+import dev.sergeantfuzzy.chestlink.gui.FilterMenu;
+import dev.sergeantfuzzy.chestlink.gui.InventoryMenu;
+import dev.sergeantfuzzy.chestlink.gui.ShareMenu;
+import dev.sergeantfuzzy.chestlink.gui.UpgradeMenu;
+import dev.sergeantfuzzy.chestlink.lang.MessageService;
+import dev.sergeantfuzzy.chestlink.listener.ChestEventsListener;
+import dev.sergeantfuzzy.chestlink.placeholder.ChestLinkPlaceholder;
+import dev.sergeantfuzzy.chestlink.storage.DataStore;
+import dev.sergeantfuzzy.chestlink.upgrade.UpgradeRegistry;
+import dev.sergeantfuzzy.chestlink.upgrade.UpgradeSettings;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-
+import net.milkbowl.vault.economy.Economy;
 import java.util.Base64;
 import org.bukkit.Bukkit;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.event.HandlerList;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class ChestLinkPlugin extends JavaPlugin {
@@ -34,7 +32,7 @@ public class ChestLinkPlugin extends JavaPlugin {
     private UpgradeSettings upgradeSettings;
     private UpgradeMenu upgradeMenu;
     private FilterMenu filterMenu;
-    private EconomyBridge economy;
+    private Economy economy;
 
     public static ChestLinkPlugin get() {
         return instance;
@@ -57,14 +55,12 @@ public class ChestLinkPlugin extends JavaPlugin {
         shareMenu = new ShareMenu(this, manager, messages);
         upgradeMenu = new UpgradeMenu(this, manager, messages);
         filterMenu = new FilterMenu(this, manager, messages);
-        setupEconomy(false);
-        scheduleEconomyRetry();
+        setupEconomy();
 
         ChestLinkCommand command = new ChestLinkCommand(this, manager, messages, menu, shareMenu, upgradeMenu);
         getCommand("chestlink").setExecutor(command);
         getCommand("chestlink").setTabCompleter(command);
         Bukkit.getPluginManager().registerEvents(new ChestEventsListener(this, manager, messages, menu, shareMenu, upgradeMenu, filterMenu), this);
-        Bukkit.getPluginManager().registerEvents(new EconomyServiceListener(this), this);
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new ChestLinkPlaceholder(this, manager).register();
@@ -109,7 +105,7 @@ public class ChestLinkPlugin extends JavaPlugin {
         return filterMenu;
     }
 
-    public EconomyBridge economy() {
+    public Economy economy() {
         return economy;
     }
 
@@ -122,27 +118,18 @@ public class ChestLinkPlugin extends JavaPlugin {
         upgrades.applySettings(upgradeSettings);
         upgradeMenu = new UpgradeMenu(this, manager, messages);
         filterMenu = new FilterMenu(this, manager, messages);
-        setupEconomy(false);
-        scheduleEconomyRetry();
+        setupEconomy();
         HandlerList.unregisterAll(this);
         Bukkit.getPluginManager().registerEvents(new ChestEventsListener(this, manager, messages, menu, shareMenu, upgradeMenu, filterMenu), this);
-        Bukkit.getPluginManager().registerEvents(new EconomyServiceListener(this), this);
     }
 
-    public void refreshEconomy() {
-        setupEconomy(false);
-    }
-
-    private void setupEconomy(boolean logMissing) {
-        economy = EconomyBridge.hook(this, logMissing);
-    }
-
-    private void scheduleEconomyRetry() {
-        Bukkit.getScheduler().runTaskLater(this, () -> {
-            if (economy == null) {
-                setupEconomy(true);
-            }
-        }, 40L);
+    private void setupEconomy() {
+        if (getServer().getPluginManager().getPlugin("Vault") == null) {
+            economy = null;
+            return;
+        }
+        RegisteredServiceProvider<Economy> provider = getServer().getServicesManager().getRegistration(Economy.class);
+        economy = provider != null ? provider.getProvider() : null;
     }
 
     private void logStatus(boolean enabled) {

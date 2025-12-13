@@ -8,15 +8,11 @@
 upgrades:
   capacity:
     enabled: true
-    max-slots: -1
+    max-slots: 72
     levels:
-      1: 36
-      2: 45
-      3: 54
-    double-levels:
       1: 63
       2: 72
-      3: 81
+      3: 72
     costs:
       1:
         type: economy
@@ -32,8 +28,11 @@ upgrades:
     strategy: alphabetical
     costs:
       1:
-        type: economy
+        type: mixed
         amount: 750.0
+        xp-levels: 5
+        items:
+          hopper: 2
   filter:
     enabled: true
     default-mode: blacklist
